@@ -6,4 +6,4 @@ For the purpose of thie repository, a **short ECPP** is a sequence of integers $
 - each $A_i$ is a nonnegative integer less than $p_i$ with $a_i\ne \pm 2\bmod p_i$,
 - each $x_i$ is a nonnegative integer less than $p_i$,
 
-such that for each $0\le i \le k$ there exist integers $B_i,y_i\in [0,p_i-1]$ for which $(x_i,y_i)$ is a point of order $m_ip_{i+1}$ on the [Montgomery curve](https://en.wikipedia.org/wiki/Montgomery_curve) $B_iy^2 = x^3 + A_ix^2 +x$.
+such that for each $0\le i \le k$ there exist integers $B_i,y_i\in [0,p_i-1]$ for which $(x_i,y_i)$ is a point of order $m_ip_{i+1}$ on the [Montgomery curve](https://en.wikipedia.org/wiki/Montgomery_curve) $B_iy^2 = x^3 + A_ix^2 +x$ modulo every prime divisor of $p_i$.
