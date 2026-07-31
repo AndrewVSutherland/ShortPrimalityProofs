@@ -12,7 +12,7 @@ For integers $p_0 > 3$, a short ECPP $(p_0,...)$ exists if and only if $p_0$ is 
 
 This repository contains the following resources:
 - vsmallECPP.py is a Python program that verifies a short ECPP in quasi-quadratic time.
-- short8all.txt contains the 201,072 short ECPPs with $p\le 2^8$; every prime $5\le p\le 2^8$ admits at least one ($p=2$ and $p=3$ admit none, which is why the definition takes $p_0\ge 5$).
+- short8all.txt contains the 201,072 short ECPPs with $p_0\le 2^8$.
 - short.gp is a GP script that uses SEA on random curves to search for short ECPPs.
 - certs.csv is a list of short ECPPs for the primes listed in the table below.
 
