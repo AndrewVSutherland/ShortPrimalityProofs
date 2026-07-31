@@ -8,28 +8,7 @@ For the purpose of this repository, a **short ECPP** is a sequence of integers $
 
 such that for each $0\le i \le k$ there exist integers $B_i,y_i\in [0,p_i-1]$ with $\gcd(B_i,p_i)=1$ for which $(x_i,y_i)$ is a point of order $m_ip_{i+1}$ on the [Montgomery curve](https://en.wikipedia.org/wiki/Montgomery_curve) $B_iy^2 = x^3 + A_ix^2 +x$ modulo every prime divisor of $p_i$.
 
-A short ECPP proves $p_0$ prime: if $\ell$ is a prime divisor of $p_i$, the reduction of $(x_i,y_i)$ has
-order $m_ip_{i+1} > L_i$ in a group of order at most $\ell+1+\lfloor 2\sqrt{\ell}\rfloor$, which is at
-most $L_i$ once $\ell\le \sqrt{p_i}$; so every prime divisor of $p_i$ exceeds $\sqrt{p_i}$ and $p_i$ is
-prime, by downward induction from $p_{k+1}=1$.  Taking the order modulo every prime divisor of $p_i$ is
-essential: the order of a point of $E(\mathbf{Z}/p_0\mathbf{Z})$ is only the least common multiple of its
-orders modulo the primes dividing $p_0$, so for a composite $p_0=\ell\ell'$ the required order can be
-split between the two factors with every other condition satisfied, as in
-```
-4410667997551 1365834658413 107710304518 4200232 199129 175565 880
-```
-where $p_0=2098153\cdot 2102167$ and $(x_0,1)$ has order exactly $8\cdot 525029 = m_0p_1$ in
-$E(\mathbf{Z}/p_0\mathbf{Z})$ --- order $8$ modulo the first factor and $525029$ modulo the second ---
-together with an honest level for the prime $p_1 = 525029$.  vsmallECPP.py rejects it, and the gcds it
-takes along the way expose both factors of $p_0$.
-
-Note that $m_i\ge 2$ always (otherwise $m_ip_{i+1} = p_{i+1} < \sqrt{p_i} < L_i$), so $r_i$ is well
-defined, and that a valid $p_{i+1}$ is a prime exceeding $n^2$, hence exactly the $n^2$-rough part of the
-product $m_ip_{i+1}$ carried in the certificate: a verifier recovers the $m_i$ and $p_{i+1}$ from the
-sequence while trial-dividing only up to $n^2$.  The conditions $p_{i+1}<\sqrt{p_i}$ and
-$m_ip_{i+1}<r_iL_i$ keep the certificate to $O(\log p_0)$ bits in $k=O(\log\log p_0)$ levels, and as with
-a [one-shot ECPP](https://github.com/AndrewVSutherland/OneShotPrimalityProofs) the whole certificate can
-be verified in quasi-quadratic time $O((\log p_0)^{2+o(1)})$.
+For integers $p_0 > 3$, a short ECPP $(p_0,...)$ exists if and only if $p_0$ is prime.  The size of a short ECPP is linear in $n=\log p_0$ and can be verified in quasi-quadratic time (in contrast to the quadratic size and quasi-cubic verification time for a conventional ECPP).
 
 This repository contains the following resources:
 - vsmallECPP.py is a Python program that verifies a short ECPP in quasi-quadratic time.
