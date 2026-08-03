@@ -113,6 +113,13 @@ is more productive than factoring inline: screen the finite discriminant interva
 full speed, then give the globally ranked low-smoothness orders their bounded factor
 passes.
 
+A five-worker continuation over `50,000,001 <= |D| <= 200,000,000` completed in
+3,083.5 seconds wall and 7,699.7 aggregate child CPU seconds.  It wrote 9,103
+checkpoints representing 8,233 distinct viable orders before downstream factoring.
+The wider interval therefore remains practical as a first-stage production scan, while
+the explicit child-CPU total makes clear that its wall-clock speed comes from parallel
+discriminant coverage rather than reduced aggregate work.
+
 Keep these full-factor lanes at modest discriminants.  `scmontgomerylevel` currently
 calls PARI's integer `polclass`; a rare factor win at a very large discriminant can make
 curve reconstruction more expensive than the order search.  Computing one CM root
