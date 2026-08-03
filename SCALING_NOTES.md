@@ -153,6 +153,13 @@ not contain an admissible child.  The same worker had otherwise begun 300 ECM cu
 bound is at most 20,000,000, converting a potentially long randomized tail into a fast
 deterministic tombstone.
 
+For comparison, a one-off audit raised the limit for the apparent `D=-36644`
+leader, whose exact complementary bound was 6,593,364,716.  The exhaustive scan
+finished in 105.1 seconds wall and 47.4 child CPU seconds, found no divisor, and
+proved that order unusable.  The default remains 20,000,000 to keep per-order
+latency negligible; a multi-billion scan is worthwhile only as an explicit
+audit of an unusually strong frontier item.
+
 ## Torsion-conditioned curves
 
 Curve family 5 ports the optimized `X_1(27)` construction from OneShotSEA.  The retained
