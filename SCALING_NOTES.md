@@ -60,8 +60,8 @@ python3 parallel_short.py "$p" -j 10 --seed 2115000 \
   --factor-seconds 20,20,20,20,20,20,5,5,5,5 \
   --factor-flags 0,0,0,0,0,0,9,9,9,9 \
   --factor-rounds 3,3,3,3,3,3,2,2,2,2 \
-  --prefactor-seconds 2 --pm1-bound 1000000 --pp1-bound 1000000 \
-  --ecm-bound 0,0,0,0,0,0,0,0,100000,100000 \
+  --prefactor-seconds 2 --pm1-bounds 1000000 --pp1-bounds 1000000 \
+  --ecm-bounds 0,0,0,0,0,0,0,0,100000,100000 \
   --ecm-curves 0,0,0,0,0,0,0,0,8,8 \
   --resume-candidates candidates/210 --resume-top 200 \
   --resume-per-worker 20 --resume-only --candidate-bits 40 \
