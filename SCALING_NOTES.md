@@ -175,6 +175,14 @@ proved that order unusable.  The default remains 20,000,000 to keep per-order
 latency negligible; a multi-billion scan is worthwhile only as an explicit
 audit of an unusually strong frontier item.
 
+A later `D=-14995663` order illustrates the same deterministic finish after a
+successful deep factor pass.  GMP-ECM reduced its residual from 455 to 361 bits,
+leaving an exact complementary bound of 33,761,519,371 (35 bits).  A one-off scan
+through that bound completed in 274.6 seconds wall and 236.4 child CPU seconds,
+found no divisor, and tombstoned the order.  The result distinguishes a genuinely
+impossible root from another randomized-factor failure and prevents all future
+portfolios from replaying it.
+
 ## Torsion-conditioned curves
 
 Curve family 5 ports the optimized `X_1(27)` construction from OneShotSEA.  The retained
