@@ -818,14 +818,25 @@ scscreenorder(p, n2, N, L, rt, {D = 0}, {R0 = 0}) = {
  * For j(E_A)=256(A^2-3)^3/(A^2-4), solve first for A^2, then try both square roots.
  * The explicit [o]Q=O check in scpoint safely distinguishes the two proposed CM orders. */
 scmontgomerylevel(p, D, N, C) = {
-  my(H, ws, jinv, zs, z, a, A, E, Et, Q, c, d = scnonsquare(p),
-     failed = 0, inv = if(D % 3, 5, 0), X = 'X);
+  my(H, ws, w, u, jinv, zs, z, a, A, E, Et, Q, c, d = scnonsquare(p),
+     failed = 0,
+     /* Weber f has dramatically smaller class-polynomial coefficients than j
+      * (or even gamma_2) when D = 1 mod 8.  PARI computes all of these with
+      * its CRT engine.  Invariant 3=f^3 covers the 3-ramified fallback. */
+     inv = if(D % 8 == 1, if(D % 3, 1, 3), if(D % 3, 5, 0)), X = 'X);
   H = iferr(polclass(D, inv), e, 0);
   if(type(H) != "t_POL", return(-1));
   ws = iferr(polrootsmod(H, p), e, 0);
   if(type(ws) != "t_COL" && type(ws) != "t_VEC", return(-1));
   for(i = 1, #ws,
-    jinv = if(inv == 5, ws[i]^3, ws[i]);
+    w = ws[i];
+    if((inv == 1 || inv == 3) && w == 0, next);
+    /* j=(f^24-16)^3/f^24; inv=1 is f and inv=3 is f^3. */
+    if(inv == 1,
+      u = w^24; jinv = (u-16)^3/u,
+      if(inv == 3,
+        u = w^8; jinv = (u-16)^3/u,
+        jinv = if(inv == 5, w^3, w)));
     zs = iferr(polrootsmod(256*(X-3)^3 - lift(jinv)*(X-4), p), e,
                failed = 1; []);
     if(type(zs) != "t_COL" && type(zs) != "t_VEC", next);

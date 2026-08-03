@@ -140,6 +140,10 @@ After a class polynomial is constructed successfully but supplies no matching Mo
 level, the runner marks each attempted seven-field screen as exhausted so that it is skipped
 on later runs.  Once every known screen for an order is exhausted, its rough checkpoint is
 also suppressed.  Reconstruction errors do not write tombstones and remain retryable.
+CM reconstruction selects the smallest supported PARI class invariant: Weber `f` (or
+`f^3` when 3 ramifies) for discriminants congruent to 1 modulo 8, `gamma_2` otherwise
+when available, and classical `j` as the fallback.  Each root is converted exactly to
+`j` before solving for the Montgomery parameter.
 Use `--resume-only` for a finite ranked-candidate pass.  The runner then records an exhausted
 outcome after all assigned candidates fail, rather than silently continuing into CM or random SEA.
 Fully factored but unusable orders are written back with residual `1` as tombstones; the loader also

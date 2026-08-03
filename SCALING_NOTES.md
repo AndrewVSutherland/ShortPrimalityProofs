@@ -169,6 +169,23 @@ divisible by 216; the twist remains available for the same point count.  Generat
 at this size takes roughly three to four minutes on one core.  A complete two-worker
 20-digit smoke search found and verified a certificate with family 5 in 0.3 seconds.
 
+## Smaller CM class invariants
+
+CM reconstruction now selects PARI's Weber class invariant whenever the discriminant
+permits it.  For `D = 1 (mod 8)`, invariant 1 supplies Weber `f` and maps a modular root
+back through `j=(f^24-16)^3/f^24`; if 3 ramifies, invariant 3 supplies `f^3` and uses the
+same formula with its eighth power.  Other discriminants retain `gamma_2` or classical
+`j`.  This does not change the exact order or certificate model, but can reduce the
+height of the class polynomial substantially before a screened order is reconstructed.
+
+As a small correctness and size check, `D=-2263` produced degree-22 polynomials occupying
+752 bytes with Weber `f` versus 1,232 bytes with `gamma_2`.  Modular roots for invariant
+1 (`D=-23`) and the 3-ramified invariant 3 fallback (`D=-15`) were converted to `j` and
+used to recover Montgomery curves having the prescribed CM orders.  The advantage grows
+in coefficient size with `|D|`; the small examples remain overhead-dominated in elapsed
+time, so this is a reconstruction-memory improvement rather than a claim that every tiny
+class polynomial is faster.
+
 ## OneShotSEA boundary at 701 bits
 
 OneShotSEA commit `c0bbf81` was built with its native C++20/GMP path.  Its generic
