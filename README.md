@@ -77,7 +77,10 @@ these orders first and spends the configured P-1, P+1, ECM, prefactor, msieve, a
 `factorint` stages only when the smooth part reaches `--cm-smooth-bits` (40 by default).  Saved
 factors are checkpointed exactly as they are for SEA-derived orders.  A usable order is converted
 back to the same Montgomery certificate format through its Hilbert class polynomial; all recursive
-levels and final verification are unchanged.  Since this Montgomery model has the rational
+levels and final verification are unchanged.  Reconstruction tests both square classes of the
+omitted Montgomery coefficient $B$; the nonsquare twist is represented internally by
+`[0,d*A,0,d^2,0]` and its x-coordinate is mapped back to the same certificate parameter $A$.
+Since this Montgomery model has the rational
 2-torsion point $(0,0)$, odd CM group orders are impossible and are discarded before any factoring.
 `--cm-start A --cm-bound B` partitions the inclusive discriminant
 range into contiguous, square-root-weighted worker blocks before each worker falls back to

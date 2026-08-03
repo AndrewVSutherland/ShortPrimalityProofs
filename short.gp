@@ -775,7 +775,7 @@ scscreenorder(p, n2, N, L, rt, {D = 0}, {R0 = 0}) = {
  * For j(E_A)=256(A^2-3)^3/(A^2-4), solve first for A^2, then try both square roots.
  * The explicit [o]Q=O check in scpoint safely distinguishes the two proposed CM orders. */
 scmontgomerylevel(p, D, N, C) = {
-  my(H, ws, jinv, zs, z, a, A, E, Q, c,
+  my(H, ws, jinv, zs, z, a, A, E, Et, Q, c, d = scnonsquare(p),
      failed = 0, inv = if(D % 3, 5, 0), X = 'X);
   H = iferr(polclass(D, inv), e, 0);
   if(type(H) != "t_POL", return(-1));
@@ -794,9 +794,18 @@ scmontgomerylevel(p, D, N, C) = {
         A = lift(Mod(sign*a, p));
         E = ellinit([0, A, 0, 1, 0], p);
         if(#E == 0, next);
+        Et = ellinit([0, (d*A)%p, 0, (d^2)%p, 0], p);
         for(k = 1, #C, c = C[k];
           Q = scpoint(E, N, c[1], c[3]);
-          if(Q != 0, return([A, lift(Q[1]), c[1], c[2]])))
+          if(Q != 0, return([A, lift(Q[1]), c[1], c[2]]));
+          /* B is not part of the certificate, so the same Montgomery
+           * parameter also admits its nonsquare-B twist.  In Weierstrass
+           * coordinates this is [0,d*A,0,d^2,0], and x maps back by x/d.
+           * The random path already tries this side; CM reconstruction must
+           * do so as well or it can discard the correct exact order. */
+          Q = scpoint(Et, N, c[1], c[3]);
+          if(Q != 0,
+            return([A, lift(Q[1]/Mod(d, p)), c[1], c[2]])))
       )
     )
   );
