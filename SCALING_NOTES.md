@@ -85,6 +85,32 @@ The practical workflow is consequently an adaptive frontier, not a fixed seed li
    frontier; and
 5. report both wall time and aggregate core-seconds, plus actual `resume_attempts`.
 
+## Low-smoothness portfolio lane
+
+The 40-bit CM screen is a ranking optimization, not a completeness threshold.  Applying
+the verifier's exact smooth/rough split to the published 110--200 digit root levels gives
+only 3--29 smooth bits.  A portfolio that factors only the 40-bit frontier therefore
+omits the regime that produced every existing large certificate.
+
+A minority lane should instead set `--cm-smooth-bits 0`, use the proven complete
+`--factor-seconds 20 --factor-flags 0` profile, and checkpoint from one smooth bit.  Exact
+CM orders remove the SEA cost from this lane, so its throughput is limited primarily by
+the intentionally bounded factor calls:
+
+```sh
+python3 parallel_short.py "$p" -j 1 --seed 2123100 \
+  --factor-seconds 20 --factor-flags 0 --factor-rounds 3 \
+  --cm-bound 5000000 --cm-smooth-bits 0 --cm-only \
+  --candidate-bits 1 --candidate-dir candidates/210 \
+  --branch-curves 64 --manifest search-runs-210.jsonl -o cert210.txt
+```
+
+Keep these full-factor lanes at modest discriminants.  `scmontgomerylevel` currently
+calls PARI's integer `polclass`; a rare factor win at a very large discriminant can make
+curve reconstruction more expensive than the order search.  Computing one CM root
+directly modulo `p` is the appropriate next implementation step before extending this
+lane to substantially larger discriminants.
+
 The frontier also applies an exact impossibility bound.  Every unresolved prime factor
 is larger than `n^2`; for a composite residual `R`, a future child prime is therefore at
 most `R/(n^2+1)`.  Once that upper bound times the known smooth part cannot clear the
