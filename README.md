@@ -13,14 +13,144 @@ For integers $p_0 > 3$, a short ECPP $(p_0,...)$ exists if and only if $p_0$ is 
 This repository contains the following resources:
 - vsmallECPP.py is a Python program that verifies a short ECPP in quasi-quadratic time.
 - short8all.txt contains the 201,072 short ECPPs with $p_0\le 2^8$.
-- short.gp is a GP script that uses SEA on random curves and their quadratic twists, with bounded backtracking from unlucky descents, to search for short ECPPs.
-- parallel_short.py runs independent short.gp searches with a mix of complete and partial factoring strategies, and verifies the first certificate found.
+- short.gp is a GP script that uses either exact CM orders or SEA on random curves and their quadratic twists, with bounded backtracking from unlucky descents, to search for short ECPPs.
+- parallel_short.py runs independent short.gp searches with a portfolio of complete factoring, partial factoring, and SEA early-abort strategies, and verifies the first certificate found.
 - certs.csv is a list of short ECPPs for the primes listed in the table below.
 
-For example, to search for a certificate with four workers and write the first verified result to `cert.txt`, run
+For example, to search for a certificate with four workers, write the first verified result to `cert.txt`, and append durable run metadata to `search-runs.jsonl`, run
 ```
-python3 parallel_short.py $(echo 'nextprime(10^150)' | gp -q) -j 4 -o cert.txt
+python3 parallel_short.py $(echo 'nextprime(10^150)' | gp -q) -j 4 -o cert.txt --manifest search-runs.jsonl
 ```
+
+The manifest records the prime, start and finish times, number of parallel worker attempts,
+every worker's seed and search configuration, wall and aggregate child CPU time, the winning
+worker, and the last curve/SEA counters reported by each worker.  Explicit nonconsecutive seeds
+can be supplied with `--seeds`.  With ten workers, the default portfolio uses eight complete-factor
+workers and two partial-factor workers.  Experimental PARI `ellsea` torsion filters can be assigned
+per worker with `--sea-torsions`; the default is unfiltered point counting because rejecting orders
+with unwanted small factors does not necessarily improve certificate-search throughput.
+Counters remain cumulative when a worker moves from a resumed order or CM presearch into its
+random-SEA fallback, so the manifest accounts for all work performed by that attempt.
+For large searches, `--deep-factor-bits` and `--deep-factor-seconds` can reserve a longer
+factorization budget for an order whose rough cofactor has already been reduced below a chosen
+bit length, without spending that budget on every order.  This adaptive pass can be used even
+when the worker's regular factor budget is zero.
+Setting a worker's `--factor-seconds` entry to zero disables its final PARI `factorint` pass while
+retaining saved external GMP-ECM work, which is useful when short timed PARI calls repeatedly
+discard their partial progress.
+`--prefactor-seconds` adds a short saved partial pass before the full factorization; flag 8 is the
+default for this stage because it omits PARI's expensive final ECM step while retaining factors
+already found.  Every returned candidate is still tested and any accepted descent is recursively
+proved, so this does not weaken certificate verification.
+The GP search enables PARI's `factor_add_primes` facility for every timed `factorint` call.  After
+an alarm expires, a cheap bounded factorization recovers prime factors that PARI discovered before
+the timeout, reduces and checkpoints the residual, and reports the event as `factor_recoveries`.
+Recovery uses `factor(R,2)`: since `R` is already $n^2$-rough, this consults PARI's add-prime
+table without repeating trial division through a large bound.
+This applies to random SEA orders, exact CM orders, resumed roots, and every recursive level.
+`--factor-rounds` bounds automatic continuation (three rounds by default); a further round is run
+only when the preceding pass found factors and strictly reduced the residual.
+All saved-factor stages stop as soon as `smooth * min(residual, sqrt(p))` cannot reach the
+certificate lower bound, since no prime factor left in that residual can then produce a descent.
+Optional `--pm1-bounds` and `--pp1-bounds` prepasses use GMP's P-1 and P+1 methods before ECM;
+any factors they find are retained and the reduced cofactor is passed to the later stages.
+`--ecm-rounds` likewise permits another GMP-ECM batch only after the preceding batch found a
+factor and reduced the residual; a no-factor batch is never repeated automatically.
+When `msieve` and GNU `timeout` are installed, `--msieve-bits` and `--msieve-seconds` add a
+one-thread, wall-time-bounded msieve stage for residuals below a selected size; every factor it
+emits before completion or timeout is retained.
+The exact $n^2$-smooth part of every curve order is extracted with repeated gcds against a cached
+product of all primes through $n^2$.  This replaces a separate division by every small prime for
+each order while retaining every prime power exactly; at the 210-digit target the cache is under
+100 KiB and is built once per worker.  Curve family 5 implements the optimized $X_1(27)$ model,
+retaining Montgomery-compatible curves with full rational 2-torsion and a rational point of order
+4, so the selected-side group order is divisible by 216 before point counting.
+The $X_1(27)$ finite-field model and map are adapted from
+[`IslayResearch/OneShotSEA`](https://github.com/IslayResearch/OneShotSEA), which implements and
+authenticates Andrew Sutherland's published optimized $X_1(27)$ formula; license attribution is
+retained in `THIRD_PARTY_NOTICES.md`.
+
+An optional CM-first root search avoids point counting for its candidate orders.  For a negative
+fundamental discriminant $D$, Cornacchia's algorithm can cheaply detect a representation
+$4p=t^2+|D|v^2$, which gives the two exact candidate orders $p+1\pm t$.  The search trial-divides
+these orders first and spends the configured P-1, P+1, ECM, prefactor, msieve, and bounded
+`factorint` stages only when the smooth part reaches `--cm-smooth-bits` (40 by default).  Saved
+factors are checkpointed exactly as they are for SEA-derived orders.  A usable order is converted
+back to the same Montgomery certificate format through its Hilbert class polynomial; all recursive
+levels and final verification are unchanged.  Since this Montgomery model has the rational
+2-torsion point $(0,0)$, odd CM group orders are impossible and are discarded before any factoring.
+`--cm-start A --cm-bound B` partitions the inclusive discriminant
+range into contiguous, square-root-weighted worker blocks before each worker falls back to
+its ordinary random-SEA search.  This weighting balances the expected number of Cornacchia
+representations, whose density decreases roughly as $1/\sqrt{|D|}$, much better than equal-width
+blocks;
+`--cm-kind odd`, `even`, or `both` selects the fundamental-discriminant families.  Using
+non-overlapping ranges makes consecutive batches reproducible and avoids duplicated work.
+For a factor-free enumeration pass, `--cm-partition width` instead gives each worker the same
+number of discriminants.  This balances wall time when testing discriminants dominates; the
+default `sqrt` partition remains useful when inline factoring cost follows the expected number
+of represented orders.
+Pass `--cm-only` to make this a finite range scan: if every worker exhausts its assigned block,
+the runner exits successfully and writes an `outcome: "exhausted"` finish record instead of
+starting the random-SEA fallback.
+
+Long searches can preserve promising root orders instead of discarding them after a bounded
+factorization.  For example, `--candidate-bits 48 --candidate-dir candidates/180` writes each
+order whose $n^2$-smooth part has at least 48 bits to a per-worker append-only file.  A record is
+`p A xden N s R`: the prime, curve parameter, twist denominator, exact curve order, smooth part,
+and remaining composite residual.  CM orders use `xden=0` and store $|D|$ in the `A` field, so
+they use the same checkpoint files without constructing a curve first.  Repeated records for one
+order checkpoint smaller residuals found by saved factoring stages.  Once an exact-order point
+test succeeds, the same file also receives a five-field `p A x o q` record for the complete root
+level.  This preserves the most expensive progress even if its recursive child subtree later
+backtracks.  A CM order that passes factoring and window selection is saved before class-polynomial
+reconstruction as a seven-field `p |D| N o q 0 0` record, so an interrupted reconstruction does
+not lose the viable order.  Passing the file or directory back with `--resume-candidates` ranks
+complete root levels first, then screened CM roots, followed by rough saved orders ranked by the
+estimated size of the complementary cofactor (then by smoothness), assigns them to workers, and
+resumes without repeating SEA or root factoring before falling back to fresh search.
+`--resume-top N` limits a portfolio to the strongest N checkpoints.  The GP function
+`shortcertfromorder(p,A,xden,N)` provides the same resume path directly; an optional row or column
+of known residual factors can be supplied as its fifth argument.  Passing `0` there and a saved
+residual as the sixth argument resumes directly from that checkpoint after verifying that it
+divides the order's original rough part.  `shortcertfromlevel(p,A,x,o,q)` resumes a complete
+five-field root-level checkpoint; the final verifier still validates the entire resulting proof.
+`shortcertcmfromscreen(p,D,N,o,q)` resumes a seven-field screened CM root and repeats only model
+reconstruction, the exact-order point test, and the recursive child proof.
+`--resume-per-worker N` lets each worker consume a round-robin queue of N globally ranked
+checkpoints in one process.  Counters and factor tables remain live across the queue, avoiding
+repeated startup and allowing a two-pass CM workflow: first enumerate exact orders with all
+factoring limits set to zero, then apply the expensive portfolio only to the strongest saved
+orders.
+For example, the first command below performs a balanced finite enumeration without factoring,
+and the second spends the full portfolio on the top 200 resulting checkpoints, twenty per worker:
+```
+python3 parallel_short.py "$p" -j 10 --cm-bound 100000000 --cm-screen-only \
+  --candidate-bits 40 --candidate-dir candidates/210 --manifest search-runs-210.jsonl
+python3 parallel_short.py "$p" -j 10 --resume-candidates candidates/210 \
+  --resume-top 200 --resume-per-worker 20 --resume-only --candidate-bits 40 \
+  --candidate-dir candidates/210 --manifest search-runs-210.jsonl -o cert210.txt
+```
+The checkpoint loader rechecks that five- and seven-field orders have exactly one admissible
+$n^2$-rough child and that their complementary factor is $n^2$-smooth before ranking them.
+After a class polynomial is constructed successfully but supplies no matching Montgomery
+level, the runner marks each attempted seven-field screen as exhausted so that it is skipped
+on later runs.  Once every known screen for an order is exhausted, its rough checkpoint is
+also suppressed.  Reconstruction errors do not write tombstones and remain retryable.
+Use `--resume-only` for a finite ranked-candidate pass.  The runner then records an exhausted
+outcome after all assigned candidates fail, rather than silently continuing into CM or random SEA.
+Fully factored but unusable orders are written back with residual `1` as tombstones; the loader also
+discards any order whose entire saved residual is below the exact minimum admissible child prime,
+so an earlier, larger checkpoint for an already exhausted order is not replayed.
+`--resume-offset K --resume-top N` selects a disjoint ranked slice for staged portfolios.
+
+For large inputs, install PARI's optional
+[`seadata` package](https://pari.math.u-bordeaux.fr/packages.html).  It supplies modular-polynomial
+tables used by `ellcard`/`ellsea` and covers the inputs in this challenge through $10^{200}$;
+PARI uses these tables automatically for every SEA call, including recursive levels and all
+parallel workers.  `parallel_short.py` reports their availability at startup, records it in the
+run manifest, and warns when they are unavailable.  The search remains correct without them, but
+falls back to substantially slower modular-polynomial computations.
 
 **Challenge**
 
