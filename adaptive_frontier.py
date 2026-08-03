@@ -26,6 +26,12 @@ def parse_args():
     parser.add_argument("-o", "--output", type=Path, required=True)
     parser.add_argument("-j", "--workers", type=int, default=4)
     parser.add_argument("--frontier-size", type=int, default=40)
+    parser.add_argument(
+        "--frontier-offset",
+        type=int,
+        default=0,
+        help="skip this many exactly ranked checkpoints before each pass",
+    )
     parser.add_argument("--max-rounds", type=int, default=4)
     parser.add_argument(
         "--stale-rounds",
@@ -46,6 +52,8 @@ def parse_args():
     for name in ("workers", "frontier_size", "max_rounds", "stale_rounds"):
         if getattr(args, name) < 1:
             parser.error(f"--{name.replace('_', '-')} must be positive")
+    if args.frontier_offset < 0:
+        parser.error("--frontier-offset must be nonnegative")
     return args
 
 
@@ -105,10 +113,16 @@ def main():
     stale = 0
     for round_index in range(args.max_rounds):
         before = load_resume_candidates(candidate_dir, args.p)
-        before_snapshot = snapshot(before, args.frontier_size)
+        before_frontier = before[
+            args.frontier_offset : args.frontier_offset + args.frontier_size
+        ]
+        if not before_frontier:
+            raise SystemExit("frontier offset is beyond the ranked checkpoint queue")
+        before_snapshot = snapshot(before_frontier, args.frontier_size)
         print(
             f"frontier round {round_index + 1}/{args.max_rounds}: "
-            f"{len(before_snapshot)} checkpoint(s); {describe(before[0])}",
+            f"{len(before_snapshot)} checkpoint(s) after offset "
+            f"{args.frontier_offset}; {describe(before_frontier[0])}",
             file=sys.stderr,
             flush=True,
         )
@@ -149,6 +163,8 @@ def main():
             str(candidate_dir),
             "--resume-candidates",
             str(candidate_dir),
+            "--resume-offset",
+            str(args.frontier_offset),
             "--resume-top",
             str(len(before_snapshot)),
             "--resume-per-worker",
@@ -172,7 +188,13 @@ def main():
             return 0
 
         after = load_resume_candidates(candidate_dir, args.p)
-        after_snapshot = snapshot(after, args.frontier_size)
+        after_frontier = after[
+            args.frontier_offset : args.frontier_offset + args.frontier_size
+        ]
+        if not after_frontier:
+            print("selected frontier slice exhausted", file=sys.stderr, flush=True)
+            break
+        after_snapshot = snapshot(after_frontier, args.frontier_size)
         if after_snapshot == before_snapshot:
             stale += 1
             print(
@@ -185,7 +207,10 @@ def main():
                 break
         else:
             stale = 0
-            print(f"frontier improved; new leader: {describe(after[0])}", file=sys.stderr)
+            print(
+                f"frontier improved; new leader: {describe(after_frontier[0])}",
+                file=sys.stderr,
+            )
 
     print("adaptive frontier exhausted without a certificate", file=sys.stderr)
     return 0

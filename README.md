@@ -164,6 +164,8 @@ stops when a complete pass makes no exact checkpoint progress.  For example:
 python3 adaptive_frontier.py "$p" -j 10 --candidate-dir candidates/210 \
   --manifest search-runs-210.jsonl -o cert210.txt
 ```
+Use `--frontier-offset K` to skip a prefix that has already received an
+appropriately deep audit while continuing to re-rank the next tranche exactly.
 The controller calls `parallel_short.py`; certificates are still independently
 checked by `vsmallECPP.py` before either process reports success.
 
