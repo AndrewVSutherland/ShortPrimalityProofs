@@ -105,6 +105,14 @@ python3 parallel_short.py "$p" -j 1 --seed 2123100 \
   --branch-curves 64 --manifest search-runs-210.jsonl -o cert210.txt
 ```
 
+A factor-free four-worker scan through `|D|=50,000,000` with
+`--cm-smooth-bits 1 --candidate-bits 1 --cm-screen-only` completed in 1,382.4 seconds
+wall and 2,567.6 aggregate child CPU seconds.  It wrote 8,850 append-only checkpoints
+representing 8,026 distinct live orders before later factoring.  This measured pipeline
+is more productive than factoring inline: screen the finite discriminant interval at
+full speed, then give the globally ranked low-smoothness orders their bounded factor
+passes.
+
 Keep these full-factor lanes at modest discriminants.  `scmontgomerylevel` currently
 calls PARI's integer `polclass`; a rare factor win at a very large discriminant can make
 curve reconstruction more expensive than the order search.  Computing one CM root
@@ -144,6 +152,13 @@ The checked-in `adaptive_frontier.py` controller implements this loop and stops 
 full pass leaves the exact ranked snapshot unchanged.  This prevents a long unattended
 run from repeatedly applying the same cheap layer after its useful frontier reductions
 have been harvested.
+
+A later low-smoothness order at `D=-15226867` reached a 419-bit residual with an exact
+maximum complementary factor of 83 bits.  An independent batch of 100 GMP-ECM curves at
+`B1=1,000,000` completed in 325.6 seconds wall and 146.8 child CPU seconds without a
+factor.  The exact bound therefore ranks the opportunity correctly but is not evidence
+that such a factor exists; after one appropriately deep negative batch, fresh orders
+again have higher expected value than repeatedly grinding the same residual.
 
 A later 210-digit frontier order reduced from 425 to 332 residual bits, leaving an exact
 maximum complementary cofactor of 17,675,219.  A complete prime-divisor scan from
