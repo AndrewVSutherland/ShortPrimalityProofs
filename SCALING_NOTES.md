@@ -140,6 +140,10 @@ old static list would not act on this much stronger lead.  The operational loop 
 
 This separates high-throughput factor discovery from expensive tail work and makes the
 portfolio responsive to partial progress without weakening any certificate condition.
+The checked-in `adaptive_frontier.py` controller implements this loop and stops after a
+full pass leaves the exact ranked snapshot unchanged.  This prevents a long unattended
+run from repeatedly applying the same cheap layer after its useful frontier reductions
+have been harvested.
 
 ## Torsion-conditioned curves
 

@@ -149,6 +149,15 @@ so an earlier, larger checkpoint for an already exhausted order is not replayed.
 Ranking uses the exact upper bound on the complementary cofactor, rather than only its
 bit length, and a later checkpoint supersedes an earlier one whenever its residual is
 strictly smaller even if both residuals have the same bit length.
+`adaptive_frontier.py` automates the bounded reload-and-rank loop.  It applies
+cheap saved-factor methods to the current frontier, rotates worker seeds, and
+stops when a complete pass makes no exact checkpoint progress.  For example:
+```
+python3 adaptive_frontier.py "$p" -j 10 --candidate-dir candidates/210 \
+  --manifest search-runs-210.jsonl -o cert210.txt
+```
+The controller calls `parallel_short.py`; certificates are still independently
+checked by `vsmallECPP.py` before either process reports success.
 
 For large inputs, install PARI's optional
 [`seadata` package](https://pari.math.u-bordeaux.fr/packages.html).  It supplies modular-polynomial
