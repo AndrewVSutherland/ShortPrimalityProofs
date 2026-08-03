@@ -119,6 +119,28 @@ checkpoint for the same order.  A focused ECM pass triggered this rule by reduci
 397-bit residual to 310 bits: another split would leave at most 291 bits, below that
 order's 299-bit minimum.
 
+## Adaptive frontier iteration
+
+A ranked queue should be refreshed after every cheap saved-factor round instead of being
+treated as a static batch.  One 20-checkpoint pass at the 210-digit target used 5-second
+partial PARI factoring, 2-second prefactoring, one P-1 and P+1 pass at `B1=5,000,000`,
+and eight GMP-ECM curves at `B1=100,000`.  It completed in 335.9 seconds wall and 167.3
+child CPU seconds.  Two ECM batches found factors: the `D=-7331` residual fell from 505
+to 425 bits, and the `D=-15600715` residual fell from 519 to 452 bits.
+
+The first reduction changed the exact maximum complementary cofactor from 177 bits to
+97 bits, promoting the order ahead of nearly the entire previous queue.  Continuing the
+old static list would not act on this much stronger lead.  The operational loop is thus:
+
+1. run a bounded cheap queue;
+2. reload every append-only checkpoint;
+3. retain the numerically smallest residual even when its bit length is unchanged;
+4. rank by the exact bound `floor(residual/minimum_q)`, not its coarse bit length; and
+5. launch deeper independent ECM only on the refreshed frontier.
+
+This separates high-throughput factor discovery from expensive tail work and makes the
+portfolio responsive to partial progress without weakening any certificate condition.
+
 ## Torsion-conditioned curves
 
 Curve family 5 ports the optimized `X_1(27)` construction from OneShotSEA.  The retained
