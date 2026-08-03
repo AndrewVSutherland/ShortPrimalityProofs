@@ -77,6 +77,7 @@ SC_pm1attempts = 0; SC_pm1factors = 0;                   \\ saved GMP P-1 calls/
 SC_pp1attempts = 0; SC_pp1factors = 0;                   \\ saved GMP P+1 calls/factors
 SC_msieveattempts = 0; SC_msievefactors = 0;             \\ bounded msieve calls that ran/found factors
 SC_exhaustedorders = 0;                                  \\ fully split orders with no admissible factor
+SC_smallcofactorcap = 20000000;                          \\ exhaustive exact-complement proof limit
 SC_factorrecoveries = 0;                                 \\ timed-out factorizations that still saved progress
 SC_cmtests = 0; SC_cmlastD = 0;                          \\ discriminants tested/current |D|
 SC_resumeattempts = 0;                                   \\ queued root checkpoints actually attempted
@@ -376,6 +377,14 @@ scspecialfactors(R, method, B1) = {
   F~;
 };
 
+/* Return a prime divisor of R in (lo,hi], or zero after proving that none exists. */
+scsmallfactor(R, lo, hi) = {
+  my(q, f = 0);
+  if(hi <= lo, return(0));
+  forprime(q = lo+1, hi, if(R % q == 0, f = q; break));
+  f;
+};
+
 /* Run a wall-time-bounded one-thread msieve pass and retain every emitted factor. */
 scmsievefactors(R) = {
   my(out, fields, q, U = R, F = List(), base);
@@ -403,7 +412,8 @@ scmsievefactors(R) = {
 /* Try one curve order that has already been computed.  A is the certificate parameter and
  * xden maps the model's x-coordinate to the certificate coordinate x/xden. */
 sctryorder(p, n2, A, xden, E, N, L, rt, {R0 = 0}) = {
-  my(sr, s, R, oldR, dv, F, EF, PF, TF, U, lev, m, o, q, Q, factortlim);
+  my(sr, s, R, oldR, dv, F, EF, PF, TF, U, lev, m, o, q, Q, factortlim,
+     minimumq, cofactorbound, smallq);
     sr = smoothpart(N, n2); s = sr[1]; R = sr[2];
     if(R0,
       if(R % R0, error("short: saved residual does not divide the rough part"));
@@ -422,6 +432,25 @@ sctryorder(p, n2, A, xden, E, N, L, rt, {R0 = 0}) = {
       if(m > L && m < factor(m)[1,1] * L,
         Q = scpoint(E, N, m, factor(m)[,1]);
         if(Q != 0, return([A, lift(Q[1]/Mod(xden, p)), m, 1]))));
+
+    /* If an admissible child q exists, its complementary factor is at most
+     * floor(R/(floor(L/s)+1)).  Exhaust a small exact interval before ECM.
+     * Since R is n2-rough, finding no divisor proves this order impossible. */
+    minimumq = L \ s + 1;
+    while(R > 1 && !ispseudoprime(R) &&
+          (cofactorbound = R \ minimumq) <= SC_smallcofactorcap,
+      smallq = scsmallfactor(R, n2, cofactorbound);
+      if(!smallq,
+        sclogcandidate(p, A, xden, N, s, 1);
+        SC_exhaustedorders++;
+        return(0)
+      );
+      lev = sctryfactors(p, n2, A, xden, E, N, L, rt, s, dv,
+                         [smallq, R/smallq]~);
+      if(lev != 0, return(lev));
+      while(R % smallq == 0, R /= smallq);
+      sclogcandidate(p, A, xden, N, s, R)
+    );
 
     \\ (b) cheap descent: if the saved rough residual is itself prime, try it directly.
     \\     This also handles reduced resume checkpoints, where prime factors already tested and
@@ -611,7 +640,7 @@ sclevel(p, n2, {stopcurve = 0}) = {
  * [o,q,prime divisors of o] candidate, or zero. */
 scscreenorder(p, n2, N, L, rt, {D = 0}, {R0 = 0}) = {
   my(sr = smoothpart(N, n2), s = sr[1], R = sr[2], oldR, dv, m, F, EF, PF, TF, U, C,
-     factortlim, terminal = List());
+     factortlim, minimumq, cofactorbound, smallq, terminal = List());
   /* Every certificate curve has the rational 2-torsion point (0,0), so its
    * full group order is even.  An odd CM order can never yield this model. */
   if(N % 2, return(0));
@@ -631,6 +660,20 @@ scscreenorder(p, n2, N, L, rt, {D = 0}, {R0 = 0}) = {
       SC_windowcandidates++;
       listput(terminal, [m, 1, factor(m)[,1]])));
   if(#terminal, return(Vec(terminal)));
+  minimumq = L \ s + 1;
+  while(R > 1 && !ispseudoprime(R) &&
+        (cofactorbound = R \ minimumq) <= SC_smallcofactorcap,
+    smallq = scsmallfactor(R, n2, cofactorbound);
+    if(!smallq,
+      if(D, sclogcmcandidate(p, D, N, s, 1));
+      SC_exhaustedorders++;
+      return(0)
+    );
+    C = scpickorders(n2, L, rt, s, dv, [smallq, R/smallq]~);
+    if(type(C) == "t_VEC", return(C));
+    while(R % smallq == 0, R /= smallq);
+    if(D, sclogcmcandidate(p, D, N, s, R))
+  );
   if(R > 1 && ispseudoprime(R),
     C = scpickorders(n2, L, rt, s, dv, [R]~);
     if(type(C) == "t_VEC", return(C));

@@ -145,6 +145,14 @@ full pass leaves the exact ranked snapshot unchanged.  This prevents a long unat
 run from repeatedly applying the same cheap layer after its useful frontier reductions
 have been harvested.
 
+A later 210-digit frontier order reduced from 425 to 332 residual bits, leaving an exact
+maximum complementary cofactor of 17,675,219.  A complete prime-divisor scan from
+`n^2+1` through that bound took 110 ms and found no divisor, proving that the order could
+not contain an admissible child.  The same worker had otherwise begun 300 ECM curves at
+`B1=1,000,000`.  Both order paths now perform this exact scan automatically whenever the
+bound is at most 20,000,000, converting a potentially long randomized tail into a fast
+deterministic tombstone.
+
 ## Torsion-conditioned curves
 
 Curve family 5 ports the optimized `X_1(27)` construction from OneShotSEA.  The retained

@@ -145,6 +145,10 @@ outcome after all assigned candidates fail, rather than silently continuing into
 Fully factored but unusable orders are written back with residual `1` as tombstones; the loader also
 discards any order whose entire saved residual is below the exact minimum admissible child prime,
 so an earlier, larger checkpoint for an already exhausted order is not replayed.
+When the exact maximum complementary cofactor is at most 20,000,000, GP now
+exhausts that small prime interval directly.  Failure to find a divisor is a
+proof that no admissible child prime exists and avoids a pointless long ECM
+tail.
 `--resume-offset K --resume-top N` selects a disjoint ranked slice for staged portfolios.
 Ranking uses the exact upper bound on the complementary cofactor, rather than only its
 bit length, and a later checkpoint supersedes an earlier one whenever its residual is
