@@ -84,6 +84,11 @@ def describe(candidate):
     )
 
 
+def verified_for(certificate, p):
+    fields = certificate.split()
+    return bool(fields) and fields[0] == str(p) and verify(certificate)
+
+
 def main():
     args = parse_args()
     candidate_dir = args.candidate_dir.resolve()
@@ -91,7 +96,7 @@ def main():
     output = args.output.resolve()
     if output.exists():
         certificate = output.read_text(encoding="utf-8").strip()
-        if verify(certificate):
+        if verified_for(certificate, args.p):
             print(certificate)
             print(f"using existing verified certificate {output}", file=sys.stderr)
             return 0
@@ -161,7 +166,7 @@ def main():
             return result.returncode
         if output.exists():
             certificate = output.read_text(encoding="utf-8").strip()
-            if not verify(certificate):
+            if not verified_for(certificate, args.p):
                 raise SystemExit(f"driver wrote an invalid certificate to {output}")
             print(certificate)
             return 0
