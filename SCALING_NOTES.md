@@ -190,6 +190,15 @@ found no divisor, and tombstoned the order.  The result distinguishes a genuinel
 impossible root from another randomized-factor failure and prevents all future
 portfolios from replaying it.
 
+The same handoff was effective at the 220-digit target.  Complete factoring first
+produced a `D=-50906279` order with a 434-bit residual and a 112-bit cofactor gap.
+One 10,000,000-bound GMP-ECM batch found a factor in 29.4 seconds wall, reducing the
+residual to 349 bits and the exact complementary bound to 185,970,789.  A one-off
+exhaustive scan completed in 2.3 seconds wall and 1.6 child CPU seconds, found no
+divisor, and tombstoned the order.  Deep randomized factoring is therefore most
+useful when it crosses into a cheap deterministic proof range, even when that proof
+rejects rather than certifies the order.
+
 ## Torsion-conditioned curves
 
 Curve family 5 ports the optimized `X_1(27)` construction from OneShotSEA.  The retained
