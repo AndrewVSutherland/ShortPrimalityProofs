@@ -143,6 +143,9 @@ Fully factored but unusable orders are written back with residual `1` as tombsto
 discards any order whose entire saved residual is below the exact minimum admissible child prime,
 so an earlier, larger checkpoint for an already exhausted order is not replayed.
 `--resume-offset K --resume-top N` selects a disjoint ranked slice for staged portfolios.
+Ranking uses the exact upper bound on the complementary cofactor, rather than only its
+bit length, and a later checkpoint supersedes an earlier one whenever its residual is
+strictly smaller even if both residuals have the same bit length.
 
 For large inputs, install PARI's optional
 [`seadata` package](https://pari.math.u-bordeaux.fr/packages.html).  It supplies modular-polynomial

@@ -713,11 +713,19 @@ def load_resume_candidates(path, p):
                 "cofactor_gap_bits": max(
                     0, residual.bit_length() - minimum_q_bits
                 ),
+                # Internal exact ranking key: if q >= minimum_q divides the
+                # residual, its complementary cofactor is at most this large.
+                # Bit lengths alone can reverse the best order inside a wide
+                # power-of-two bucket.
+                "_cofactor_bound": residual // minimum_q,
                 "source": str(candidate_file.resolve()),
                 "line": line_number,
             }
             previous = candidates.get(key)
-            if previous is None or record["residual_bits"] < previous["residual_bits"]:
+            # A saved factoring stage may shrink R without crossing a bit
+            # boundary.  Preserve that exact progress rather than replaying
+            # the earlier, strictly larger checkpoint.
+            if previous is None or residual < int(previous["residual"]):
                 candidates[key] = record
     # Once every known viable screen for a CM order is tombstoned, repeating
     # its rough-order factoring can only reproduce the same exhausted choices.
@@ -726,15 +734,20 @@ def load_resume_candidates(path, p):
             candidates.pop(("order", D, 0, N), None)
     if not candidates:
         raise SystemExit(f"no candidate records found in {path}")
-    return sorted(
+    ranked = sorted(
         candidates.values(),
         key=lambda candidate: (
             candidate["rank"],
-            candidate["cofactor_gap_bits"],
+            candidate.get("_cofactor_bound", 0),
             -candidate["smooth_bits"],
             candidate["residual_bits"],
         ),
     )
+    # Do not leak the large internal integer into manifests or the public
+    # resume-order schema.
+    for candidate in ranked:
+        candidate.pop("_cofactor_bound", None)
+    return ranked
 
 
 def utc_now():
