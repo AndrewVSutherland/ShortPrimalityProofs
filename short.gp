@@ -6,23 +6,27 @@
  * sequence  (p_0, A_0, x_0, o_0, A_1, x_1, o_1, ..., A_k, x_k, o_k)  with o_i = m_i*p_{i+1},
  * p_{k+1} = 1 and n = ceil(log_2 p_0) FIXED for the whole chain: on E_{A_i} : y^2 = x^3 +
  * A_i x^2 + x over F_{p_i} the point with x-coordinate x_i has order exactly o_i, where m_i
- * is n^2-smooth, p_{i+1} is a prime in (n^2, sqrt(p_i)) proven prime by the next level, and
- * L_i < o_i < r_i L_i with L_i = (p_i^{1/4}+1)^2 and r_i the least prime divisor of m_i.
+ * is B-smooth for B = floor(n^2/log_2 n) with floor(log_2 rad(m_i)) < n/log_2 n (rad(m) is
+ * the product of the distinct primes of m), p_{i+1} is a prime in (n^2, sqrt(p_i)) proven
+ * prime by the next level, and L_i < o_i < r_i L_i with L_i = (p_i^{1/4}+1)^2 and r_i the
+ * least prime divisor of m_i.
  *
  * Method.  For each level we search random curves E_A/F_{p_i}, compute N = #E_A by SEA
  * (ellcard), and look for a divisor o | N inside the narrow window (L_i, r_i L_i) -- note
  * o is only about sqrt(p_i), so most of N is discarded.  A usable o must be of the shape
- * (n^2-smooth) * (one prime), so we trial-divide N up to n^2 to get its smooth part s,
- * and then look for the single large prime among the factors of the rough part N/s.  That
- * last step is the expensive one: the rough part is factored under an `alarm` time budget
- * (SC_tlim seconds) and the curve is abandoned if the budget runs out -- an early abort
- * that keeps the search on curves whose order factors easily.  A level with a fully
- * n^2-smooth o (p_{i+1} = 1) ends the chain.
+ * (B-smooth with a small radical) * (one prime), so we trial-divide N up to B to get its
+ * smooth part s, and then look for the single large prime among the factors of the rough
+ * part N/s.  That last step is the expensive one: the rough part is factored under an
+ * `alarm` time budget (SC_tlim seconds) and the curve is abandoned if the budget runs out
+ * -- an early abort that keeps the search on curves whose order factors easily.  A level
+ * with a fully smooth o (p_{i+1} = 1) ends the chain.
  *
  * Usage:
  *     echo 'printshort(nextprime(10^30))' | gp -q short.gp
  *     echo 'SC_tlim = 60; printshort(nextprime(10^100))' | gp -q short.gp
  */
+
+default(parisizemax, 2^32);                              \\ let the stack grow for large ellcard calls
 
 SC_curves = 0;                                           \\ curves tried (all levels)
 SC_tlim = 20;                                            \\ seconds allowed per rough-part factorization
@@ -30,7 +34,7 @@ SC_tlim = 20;                                            \\ seconds allowed per 
                                                          \\  large prime considered is a prime rough part)
 SC_maxcurves = 0;                                        \\ 0 = unlimited; else give up after this many curves
 
-/* n^2-smooth part s of N and the rough cofactor r = N/s, by trial division over primes <= B */
+/* B-smooth part s of N and the rough cofactor r = N/s, by trial division over primes <= B */
 smoothpart(N, B) = {
   my(s = 1, r = N);
   forprime(q = 2, B, while(r % q == 0, r /= q; s *= q));
@@ -38,6 +42,9 @@ smoothpart(N, B) = {
 };
 
 scbound(p) = sqrtint(p) + 1 + sqrtint(4 * sqrtint(p));   \\ integer form of L = (p^{1/4}+1)^2
+
+/* radical cap: floor(log_2 rad(m)) < radlim */
+radcap(m, radlim) = #binary(vecprod(factor(m)[,1])) - 1 < radlim;
 
 /* A point of order exactly o on E (N = #E, o | N, fo = the primes of o), or 0 if none found. */
 scpoint(E, N, o, fo) = {
@@ -53,7 +60,7 @@ scpoint(E, N, o, fo) = {
 };
 
 /* One level: search random curves over F_p for [A, x0, o, p_next].  p_next = 1 ends the chain. */
-sclevel(p, n2) = {
+sclevel(p, n2, B, radlim) = {
   my(L = scbound(p), rt = sqrtint(p), A, E, N, sr, s, R, dv, F, m, o, q, Q);
   while(1,
     if(SC_maxcurves && SC_curves >= SC_maxcurves, return(0));
@@ -61,24 +68,23 @@ sclevel(p, n2) = {
     A = random(p); E = ellinit([0, A, 0, 1, 0], p);
     if(#E == 0, next);                                   \\ singular (A = +-2 mod p)
     N = ellcard(E);                                      \\ SEA
-    sr = smoothpart(N, n2); s = sr[1]; R = sr[2];
+    sr = smoothpart(N, B); s = sr[1]; R = sr[2];
     dv = divisors(s);
 
-    \\ (a) terminal level: o = m is n^2-smooth all by itself, and lands in the window
+    \\ (a) terminal level: o = m is B-smooth all by itself, radical-capped, in the window
     for(i = 1, #dv, m = dv[i];
-      if(m > L && m < factor(m)[1,1] * L,
+      if(m > L && m < factor(m)[1,1] * L && radcap(m, radlim),
         Q = scpoint(E, N, m, factor(m)[,1]);
         if(Q != 0, return([A, lift(Q[1]), m, 1]))));
 
-    \\ (b) cheap descent: the rough part is itself prime, so q = R needs no factoring.  Then the
-    \\     discarded cofactor N/o = s/m divides s, i.e. the whole ~sqrt(p) worth of N that we
-    \\     throw away must be n^2-smooth.  That forces s > L, of density rho(ln(sqrt p)/ln(n^2)):
-    \\     measured on 200 random curves it is 25% at p ~ 10^10 but already 0/200 by p ~ 10^40,
-    \\     so this cheap case alone does not scale -- hence (c).  Costs one primality test.
-    if(s > L && R > 1 && R < rt && ispseudoprime(R),
+    \\ (b) cheap descent: the rough part is itself prime, so q = R needs no factoring (note the
+    \\     explicit R > n^2: roughness only guarantees R > B).  Then the discarded cofactor
+    \\     N/o = s/m divides s, i.e. the whole ~sqrt(p) worth of N that we throw away must be
+    \\     smooth, which is very rare for large p -- hence (c).  Costs one primality test.
+    if(s > L && R > n2 && R < rt && ispseudoprime(R),
       q = R;
       for(i = 1, #dv, m = dv[i]; o = m * q;
-        if(m > 1 && o > L && o < factor(m)[1,1] * L,
+        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
           Q = scpoint(E, N, o, concat(factor(m)[,1], [q]~));
           if(Q != 0, return([A, lift(Q[1]), o, q])))));
 
@@ -91,7 +97,7 @@ sclevel(p, n2) = {
         for(j = 1, #F, q = F[j];
           if(q > n2 && q < rt,
             for(i = 1, #dv, m = dv[i]; o = m * q;
-              if(m > 1 && o > L && o < factor(m)[1,1] * L,
+              if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
                 Q = scpoint(E, N, o, concat(factor(m)[,1], [q]~));
                 if(Q != 0, return([A, lift(Q[1]), o, q]))))))))
   );
@@ -101,10 +107,11 @@ sclevel(p, n2) = {
 shortcert(p) = {
   if(!ispseudoprime(p), error("short: p is composite"));
   if(p < 5, error("short: need p >= 5"));
-  my(n = #binary(p), n2 = n^2, seq = [p], cur = p, lev);
+  my(n = #binary(p), n2 = n^2, lg = log(n)/log(2), B = floor(n^2/lg), radlim = n/lg,
+     seq = [p], cur = p, lev);
   SC_curves = 0;
   while(cur > 1,
-    lev = sclevel(cur, n2);
+    lev = sclevel(cur, n2, B, radlim);
     if(lev == 0, return(0));                             \\ gave up (SC_maxcurves reached)
     seq = concat(seq, [lev[1], lev[2], lev[3]]);
     cur = lev[4]

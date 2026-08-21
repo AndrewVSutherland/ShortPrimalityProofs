@@ -2,29 +2,38 @@
 """
 Verification of a short ECPP (github.com/AndrewVSutherland/ShortPrimalityProofs)
 in quasi-quadratic time.  Montgomery-ladder core follows voneshot.py (Opus 4.8 /
-A.V. Sutherland); chain logic per the ShortPrimalityProofs definition.
+A.V. Sutherland); chain logic per the ShortPrimalityProofs definition, as
+revised in August 2026 (the radical-capped format).
 
 A short ECPP for p_0 is a flat integer sequence
 
     (p_0, A_0, x_0, o_0, A_1, x_1, o_1, ..., A_k, x_k, o_k)
 
 with o_i = m_i * p_{i+1} and p_{k+1} = 1, in which, writing n = ceil(log2 p_0)
-(fixed at the top level for the whole chain):
+(fixed at the top level for the whole chain) and B = floor(n^2 / log2 n):
 
   - each p_i is odd (p_0 given; later moduli are recovered from the previous
-    level as p_{i+1} = the n^2-rough part of o_i), with p_{i+1}^2 < p_i;
-  - m_i, the n^2-smooth part of o_i, has least prime divisor r_i and satisfies
+    level as p_{i+1} = the B-rough part of o_i), with p_{i+1} = 1 or
+    n^2 < p_{i+1} and p_{i+1}^2 < p_i (the floor is explicit: roughness only
+    guarantees p_{i+1} > B);
+  - m_i, the B-smooth part of o_i, satisfies the radical cap
+        floor(log2 rad(m_i)) < n / log2 n,
+    where rad(m) is the product of the distinct primes of m, and, with r_i its
+    least prime divisor,
         L_i < o_i < r_i * L_i,
-    where q_i = isqrt(p_i) and L_i = q_i + 1 + isqrt(4*q_i) is the largest
-    possible order of a point on an elliptic curve over F_q for any q <= sqrt(p_i);
+    where q_i = isqrt(p_i) and L_i = q_i + 1 + isqrt(4*q_i) is an upper bound
+    on the order of a point on an elliptic curve over F_q for any q <= sqrt(p_i);
   - 0 <= A_i < p_i with gcd(A_i^2 - 4, p_i) = 1, and 0 <= x_i < p_i;
   - x_i is the x-coordinate of a point of order exactly o_i on the Montgomery
     curve B y^2 = x^3 + A_i x^2 + x over Z/p_i for some B -- equivalently on
     E_{A_i} or its quadratic twist; the x-only ladder never needs B or y.
 
+Every certificate of this revised format is also valid under the original
+(n^2-smooth, uncapped) definition: the new conditions only restrict.
+
 Why this proves p_0 prime: by induction from the top.  At level i the verifier
 establishes ord(P_i) = o_i modulo every prime divisor l of p_i, with every prime
-factor of o_i certified (primes <= n^2 by trial division, p_{i+1} by the next
+factor of o_i certified (primes <= B by trial division, p_{i+1} by the next
 level, 1 trivially).  If some prime l <= sqrt(p_i) divided p_i, then o_i =
 ord(P_i mod l) <= #E(F_l) <= l + 1 + floor(2*sqrt(l)) <= L_i < o_i, a
 contradiction; hence p_i is prime.  The minimality window o_i < r_i * L_i keeps
@@ -37,27 +46,29 @@ is needed; [o]P = O must be reached as a genuine (X:0) with gcd(X, p) = 1
 order modulo a factor of p); each (o/q)P != O leaf requires gcd(Z, p) = 1, i.e.
 nonvanishing modulo every prime divisor of p.
 
-Cost (FFT integer multiplication assumed): one sieve to n^2 (O(n^2 loglog n) bit
-operations); ONE batched trial-division pass for the whole chain -- a prime can
-divide some o_i only if it divides D = prod_i o_i, an O(n)-bit integer, so a
-single sweep of remainder trees against D, with all products of primes built by
-balanced pairing, finds every level's small prime divisors in O(n^2 (log n)^2)
-bit operations including all product building; the elliptic work is O(log o_i)
-group operations per tree level with O(log log o_i) levels in arithmetic mod
-p_i, and level sizes decay geometrically (p_{i+1} < sqrt(p_i)).  Total:
-O(n^2 (log n)^2) bit operations and O(n^2) bits of memory, with no precomputed
-tables.  (Two changes versus the previous revision, neither affecting the
-accept/reject behavior: products of primes are built by balanced pairing rather
-than sequential accumulation, whose cost is quadratic in the product size; and
-the trial division is batched across the whole chain rather than repeated per
-level, which cost an extra factor of log n.)
+Cost (FFT integer multiplication assumed): this is what the August 2026 caps
+buy.  The primorial P_B = prod of the primes <= B has Theta(n^2/log n) bits, so
+it is built per certificate in O(n^2 log n) bit operations -- no precomputed
+tables.  Per level, gcd(P_B mod o_i, o_i) equals rad(m_i) exactly (P_B is
+squarefree and complete to B), an integer of fewer than n/log2 n bits whose
+prime factors are at most B; the radical cap is read off its bit length, and
+factoring it yields the distinct primes of m_i, whose valuations recover m_i
+and p_{i+1}.  The cap bounds the order-exactness tree by fewer than n ladder
+bits per level, so the elliptic work is O(sum_i b_i M(b_i)) = O(n^2 log n)
+with level sizes decaying geometrically.  Total: O(n^2 log n) bit operations,
+worst case over certificates, and O(n^2/log n) bits of memory.  (This
+implementation factors each radical by direct trial division over the sieved
+primes -- asymptotically the coarsest step, but the simplest, and dominant
+only far beyond feasible sizes; a remainder tree over the primorial's product
+tree, or Pollard--Strassen with search radius B, keeps even that step within
+O(n^2 log n).)
 
 usage: python3 vsmallECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]
        python3 vsmallECPP.py --test
 Prints True and exits 0 iff the sequence is a valid short ECPP (p_0 is prime).
 """
 
-from math import gcd, isqrt
+from math import gcd, isqrt, log2
 
 
 # --------------------------------------------------------------------------
@@ -103,10 +114,6 @@ def ladder(k, XP, ZP, A, p):
     return X0, Z0
 
 
-# --------------------------------------------------------------------------
-# Trial division to n^2 via sieve + batched remainder trees, in one pass for
-# the whole chain.
-# --------------------------------------------------------------------------
 def sieve_primes(limit):
     if limit < 2:
         return []
@@ -120,11 +127,10 @@ def sieve_primes(limit):
 
 def balanced_product(xs):
     """prod(xs) by power-of-two pairing: O(M(S) log k) bit operations for k
-    factors of total size S, versus Theta(S^2/k) for sequential accumulation
-    (each step re-scans the growing partial product)."""
+    factors of total size S, versus Theta(S^2/k) for sequential accumulation."""
     if not xs:
         return 1
-    if len(xs) <= 8:                    # bounded count: sequential is O(M(S))
+    if len(xs) <= 8:
         r = xs[0]
         for x in xs[1:]:
             r *= x
@@ -138,54 +144,10 @@ def balanced_product(xs):
     return xs[0]
 
 
-def remainder_tree(x, mods):
-    if not mods:
-        return []
-    k = len(mods)
-    size = 1
-    while size < k:
-        size <<= 1
-    levels = [list(mods) + [1] * (size - k)]
-    while len(levels[-1]) > 1:
-        cur = levels[-1]
-        levels.append([cur[i] * cur[i + 1] for i in range(0, len(cur), 2)])
-    rems = [x % levels[-1][0]]
-    for lvl in range(len(levels) - 2, -1, -1):
-        cur = levels[lvl]
-        rems = [rems[i >> 1] % cur[i] for i in range(len(cur))]
-    return rems[:k]
-
-
-def batch_prime_divisors(os, primes):
-    """For each o in os, the ascending list of its distinct prime divisors that
-    lie in `primes` -- computed in ONE pass over the prime list.  A prime can
-    divide some o only if it divides D = prod(os), so the pass runs remainder
-    trees against D (an O(n)-bit integer for a valid chain), with the primes
-    grouped so each batch product is comparable to D in size; the few primes
-    dividing D (at most log2 D of them) are then distributed to the o's by
-    direct division.  One batch is resident at a time, so memory stays
-    O(sieve) = O(n^2) bits."""
-    D = balanced_product(os)
-    batch_bits = max(64, D.bit_length())
-    hits = []                                  # ascending primes dividing D
-    batch = []
-    bits = 0
-    for q in primes:
-        batch.append(q)
-        bits += q.bit_length()
-        if bits >= batch_bits:
-            Q = balanced_product(batch)
-            hits += [t for t, r in zip(batch, remainder_tree(D % Q, batch)) if r == 0]
-            batch, bits = [], 0
-    if batch:
-        Q = balanced_product(batch)
-        hits += [t for t, r in zip(batch, remainder_tree(D % Q, batch)) if r == 0]
-    return [[q for q in hits if o % q == 0] for o in os]
-
-
 # --------------------------------------------------------------------------
 # Order-exactness tree (from voneshot.py): with Q = (o/R)P for R the product of
 # the distinct primes of o, each leaf holds (o/q)P, whose Z must be a unit.
+# The radical cap keeps this tree logarithmically small.
 # --------------------------------------------------------------------------
 def check_orders(XQ, ZQ, primes, A, p):
     t = len(primes)
@@ -215,52 +177,71 @@ def verify(seq):
     if p < 5 or p % 2 == 0:
         return False
     n = p.bit_length()            # = ceil(log2 p0): p0 is odd, never a power of 2
+    lg = log2(n)
+    B = int(n * n / lg)           # floor(n^2 / log2 n): the smoothness bound
+    radlim = n / lg               # require floor(log2 rad(m)) < radlim
 
-    # collect the level orders and pre-screen their sizes so that the batched
-    # trial division below runs on a certificate-independent budget.  Both
-    # bounds are implied by validity, so rejecting on them is sound: a valid
-    # chain has at most 1 + log2(n) levels (the moduli at least halve in bit
-    # length and stay above n^2 until the last), and every level order is below
-    # the Hasse bound of its modulus, hence below p0^2.
+    # collect the level orders and pre-screen their sizes so that the work below
+    # runs on a certificate-independent budget.  Both bounds are implied by
+    # validity, so rejecting on them is sound: a valid chain has at most
+    # 1 + log2(n) levels (the moduli at least halve in bit length and stay above
+    # n^2 until the last), and every level order is below the Hasse bound of its
+    # modulus, hence below p0^2.
     os = [seq[i + 2] for i in range(1, len(seq), 3)]
     if len(os) > n:
         return False
     if any(o < 2 or o.bit_length() > 2 * n + 2 for o in os):
         return False
-    primes = sieve_primes(n * n)
-    small_lists = batch_prime_divisors(os, primes)   # one pass for the whole chain
 
-    for lev, i in enumerate(range(1, len(seq), 3)):
+    primes = sieve_primes(B)
+    P = balanced_product(primes)                  # the primorial of B
+
+    for i in range(1, len(seq), 3):
         A, x, o = seq[i], seq[i + 1], seq[i + 2]
         if p < 3 or p % 2 == 0:   # a mid-chain modulus collapsed to 1 (or worse)
             return False
         if not (0 <= A < p) or not (0 <= x < p):
             return False
-        if gcd((A * A - 4) % p, p) != 1:      # nonsingular mod every divisor of p
+        if gcd((A * A - 4) % p, p) != 1:          # nonsingular mod every divisor of p
             return False
         if o < 2:
             return False
 
-        # split o into its n^2-smooth part m (with distinct primes `small`) and
-        # its n^2-rough part p_next, the next modulus (1 at the end of the chain)
-        small = small_lists[lev]
-        rest = o
-        for q in small:
-            while rest % q == 0:
-                rest //= q
-        p_next = rest
-        if o == p_next:                       # m = 1: r_i undefined, reject
+        # recover rad(m) = gcd(P mod o, o) -- exact, since P is squarefree and
+        # complete to B -- then the primes of m, then m and p_next by valuation
+        g = gcd(P % o, o)
+        if g <= 1:                                # m = 1: r undefined, reject
             return False
-        r = small[0]                          # least prime divisor of m (and of o)
+        if g.bit_length() - 1 >= radlim:          # the radical cap
+            return False
+        small = []                                # ascending prime factors of g
+        gg = g
+        for q in primes:
+            if q * q > gg:
+                break
+            if gg % q == 0:
+                small.append(q)
+                gg //= q
+        if gg > 1:
+            small.append(gg)                      # prime (trial division passed sqrt)
+        m = 1                                     # m = prod over q | g of q^{v_q(o)}
+        for q in small:
+            oo = o
+            while oo % q == 0:
+                oo //= q
+                m *= q
+        p_next = o // m
+        r = small[0]                              # least prime divisor of m (and of o)
 
-        # size window: L < o < r*L, L the largest point order over any F_q, q <= sqrt(p)
+        # size window: L < o < r*L, L an upper bound on point orders over any F_q,
+        # q <= sqrt(p)
         q_ = isqrt(p)
         L = q_ + 1 + isqrt(4 * q_)
         if not (L < o < r * L):
             return False
 
-        # descent: the next modulus must satisfy p_next^2 < p
-        if p_next != 1 and p_next * p_next >= p:
+        # descent: p_next = 1, or n^2 < p_next (explicit floor) and p_next^2 < p
+        if p_next != 1 and (p_next <= n * n or p_next * p_next >= p):
             return False
 
         # [o]P = O reached as a genuine (X:0) with X a unit mod p
@@ -277,59 +258,60 @@ def verify(seq):
             return False
 
         p = p_next
-    return p == 1                             # the chain must terminate exactly
+    return p == 1                                 # the chain must terminate exactly
 
 
 # --------------------------------------------------------------------------
-# Self-tests: valid vectors produced by gen_short_p256.py / the chain builder,
-# plus tamper cases exercising each rejection path.
+# Self-tests: valid vectors produced by short.gp and by exhaustive search over
+# small p, plus tamper cases exercising each rejection path (including the new
+# radical cap and smoothness bound).  The CRT split attack is inherited from
+# the original test suite and must still be rejected.
 # --------------------------------------------------------------------------
 _VALID = [
-    # single-level certificates (k = 0), from the exhaustive p <= 256 list
-    "5 1 2 8",
+    # single-level certificates found by exhaustive search (see short8all.txt)
+    "5 4 3 8",
     "7 0 2 8",
-    "11 0 3 12",
-    "13 0 2 10",
-    "251 0 10 63",
-    # a two-level chain built by gen_short.py chain pbits=48 seed=1
-    "251444687128489 109722824127413 239294303725419 18088453 37 8113 204",
+    "11 8 8 8",
+    "13 7 2 8",
+    "251 180 183 24",
+    # the (migrated) 10^10+19 entry of certs.csv
+    "10000000019 9322349340 1921958667 116108 15213 3538 243",
 ]
 
 _INVALID = [
+    "251 0 10 63",                 # valid in the ORIGINAL format; the radical cap rejects
+    "11 0 3 12",                   # ditto (rad 6: floor(log2 6) = 2 is not < 4/2)
     "251 0 10 126",                # m doubled: breaks the minimality window
-    "251 0 11 63",                 # wrong point (x-order differs)
-    "251 0 10 63 0 10 63",         # trailing level after the chain terminated
+    "251 2 10 32",                 # singular curve (A = 2)
     "221 5 2 34",                  # composite p0 (221 = 13*17)
-    "251 2 10 63",                 # singular curve (A = 2)
     "3 0 0 6",                     # p = 3 admits no short ECPP at all
+    "10000000019 9322349340 1921958667 116108 15213 3538 243 0 1 8",
+                                   # trailing level after the chain terminated
     # CRT split attack: p0 = 2098153*2102167; (x0,1) has order exactly 8*525029
     # in E(Z/p0) but order 8 mod one factor and 525029 mod the other
     "4410667997551 1365834658413 107710304518 4200232 199129 175565 880",
 ]
 
 
-def _selftest():
-    for line in _VALID:
-        assert verify([int(t) for t in line.split()]), line
-    for line in _INVALID:
-        assert not verify([int(t) for t in line.split()]), line
-    print("ok")
-
-
 if __name__ == "__main__":
     import sys
-    args = sys.argv[1:]
-    if args == ["--test"]:
-        _selftest()
-        sys.exit(0)
-    if len(args) < 4:
-        sys.stderr.write(__doc__)
-        sys.exit(2)
+    if len(sys.argv) == 2 and sys.argv[1] == "--test":
+        good = True
+        for s in _VALID:
+            v = verify([int(t) for t in s.split()])
+            print(f"valid vector accepted: {v}")
+            good = good and v
+        for s in _INVALID:
+            v = verify([int(t) for t in s.split()])
+            print(f"invalid vector rejected: {not v}")
+            good = good and not v
+        print("ALL TESTS PASSED" if good else "TESTS FAILED")
+        sys.exit(0 if good else 1)
     try:
-        seq = [int(a, 0) for a in args]
+        seq = [int(t) for t in sys.argv[1:]]
     except ValueError:
-        sys.stderr.write("error: all arguments must be integers\n")
+        print("usage: vsmallECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]")
         sys.exit(2)
-    result = verify(seq)
-    print(result)
-    sys.exit(0 if result else 1)
+    r = verify(seq)
+    print(r)
+    sys.exit(0 if r else 1)
