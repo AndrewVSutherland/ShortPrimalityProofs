@@ -186,6 +186,7 @@ def verify(seq):
     from math import ceil
     B = ceil(n * n / lg)          # ceil(n^2 / log2 n): the smoothness bound
     B2 = B * B                    # recursion floor; a B-rough integer < B^2 is prime
+    radlim = ceil(n / lg)         # radical cap: log2 rad(m) <= radlim
 
     # collect the level orders and pre-screen their sizes so that the work below
     # runs on a certificate-independent budget.  Both bounds are implied by
@@ -218,8 +219,8 @@ def verify(seq):
         g = gcd(P % o, o)
         if g <= 1:                                # m = 1: r undefined, reject
             return False
-        if g.bit_length() > B:                    # log2 rad(m) <= B, as specified
-            return False                          # (cannot bind: log2 rad < n/2 + log2 B << B)
+        if g.bit_length() > radlim:               # log2 rad(m) <= ceil(n/log2 n): exact,
+            return False                          # since a squarefree 2-power is just 2
         small = []                                # ascending prime factors of g
         gg = g
         for q in primes:
@@ -293,13 +294,11 @@ _VALID = [
     # the 10^20+39 entry: one recursive level (p_1 = 1134163 > B^2) + a fully
     # smooth terminal
     "100000000000000000039 89951393186720294033 26135327929659638076 11876954936 609883 131044 1915",
-    # valid again under the August 2026 convention (the earlier draft's radical
-    # cap floor(log2 rad) < n/log2 n rejected these; log2 rad <= B does not)
-    "251 0 10 63",
-    "11 0 3 12",
 ]
 
 _INVALID = [
+    "251 0 10 63",                 # valid in the ORIGINAL format; the radical cap rejects
+    "11 0 3 12",                   # ditto (rad 6: log2 6 = 2.58 > ceil(4/2) = 2)
     "251 0 10 126",                # m doubled: breaks the minimality window
     "251 2 10 32",                 # singular curve (A = 2)
     "221 5 2 34",                  # composite p0 (221 = 13*17)

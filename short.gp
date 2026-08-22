@@ -6,8 +6,8 @@
  * sequence  (p_0, A_0, x_0, o_0, A_1, x_1, o_1, ..., A_k, x_k, o_k)  with o_i = m_i*p_{i+1},
  * p_{k+1} = 1 and n = ceil(log_2 p_0) FIXED for the whole chain: on E_{A_i} : y^2 = x^3 +
  * A_i x^2 + x over F_{p_i} the point with x-coordinate x_i has order exactly o_i, where m_i
- * is B-smooth for B = ceil(n^2/log_2 n) with log_2 rad(m_i) <= B (rad(m) is
- * the product of the distinct primes of m), p_{i+1} is B-rough and either a prime in
+ * is B-smooth for B = ceil(n^2/log_2 n) with log_2 rad(m_i) <= ceil(n/log_2 n) (rad(m)
+ * is the product of the distinct primes of m), p_{i+1} is B-rough and either a prime in
  * (B^2, sqrt(p_i)) proven prime by the next level, or -- at the last level only -- 1 or
  * below B^2 (a B-rough integer below B^2 is 1 or prime, so it certifies itself by size),
  * and L_i < o_i < r_i L_i with L_i = (p_i^{1/4}+1)^2 and r_i the least prime divisor of m_i.
@@ -44,8 +44,8 @@ smoothpart(N, B) = {
 
 scbound(p) = sqrtint(p) + 1 + sqrtint(4 * sqrtint(p));   \\ integer form of L = (p^{1/4}+1)^2
 
-/* radical condition: log_2 rad(m) <= B */
-radcap(m, B) = #binary(vecprod(factor(m)[,1])) <= B;
+/* radical cap: log_2 rad(m) <= radlim (exact: a squarefree 2-power is just 2) */
+radcap(m, radlim) = #binary(vecprod(factor(m)[,1])) <= radlim;
 
 /* A point of order exactly o on E (N = #E, o | N, fo = the primes of o), or 0 if none found. */
 scpoint(E, N, o, fo) = {
@@ -62,7 +62,7 @@ scpoint(E, N, o, fo) = {
 
 /* One level: search random curves over F_p for [A, x0, o, p_next].  p_next = 1 ends the chain
  * (including the self-certifying case: a prime q < B^2 stays inside o and needs no recursion). */
-sclevel(p, B, B2) = {
+sclevel(p, B, B2, radlim) = {
   my(L = scbound(p), rt = sqrtint(p), A, E, N, sr, s, R, dv, F, m, o, q, Q);
   while(1,
     if(SC_maxcurves && SC_curves >= SC_maxcurves, return(0));
@@ -75,7 +75,7 @@ sclevel(p, B, B2) = {
 
     \\ (a) terminal level: o = m is B-smooth all by itself, radical-capped, in the window
     for(i = 1, #dv, m = dv[i];
-      if(m > L && m < factor(m)[1,1] * L && radcap(m, B),
+      if(m > L && m < factor(m)[1,1] * L && radcap(m, radlim),
         Q = scpoint(E, N, m, factor(m)[,1]);
         if(Q != 0, return([A, lift(Q[1]), m, 1]))));
 
@@ -83,7 +83,7 @@ sclevel(p, B, B2) = {
     \\      automatically prime (no primality test needed!), and stays inside o
     if(R > 1 && R < B2,
       for(i = 1, #dv, m = dv[i]; o = m * R;
-        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, B),
+        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
           Q = scpoint(E, N, o, concat(factor(m)[,1], [R]~));
           if(Q != 0, return([A, lift(Q[1]), o, 1])))));
 
@@ -94,7 +94,7 @@ sclevel(p, B, B2) = {
     if(s > L && R > B2 && R < rt && ispseudoprime(R),
       q = R;
       for(i = 1, #dv, m = dv[i]; o = m * q;
-        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, B),
+        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
           Q = scpoint(E, N, o, concat(factor(m)[,1], [q]~));
           if(Q != 0, return([A, lift(Q[1]), o, q])))));
 
@@ -107,7 +107,7 @@ sclevel(p, B, B2) = {
         for(j = 1, #F, q = F[j];
           if(q < rt,
             for(i = 1, #dv, m = dv[i]; o = m * q;
-              if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, B),
+              if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
                 Q = scpoint(E, N, o, concat(factor(m)[,1], [q]~));
                 if(Q != 0, return([A, lift(Q[1]), o, if(q < B2, 1, q)]))))))))
   );
@@ -117,11 +117,11 @@ sclevel(p, B, B2) = {
 shortcert(p) = {
   if(!ispseudoprime(p), error("short: p is composite"));
   if(p < 5, error("short: need p >= 5"));
-  my(n = #binary(p), lg = log(n)/log(2), B = ceil(n^2/lg), B2 = B^2,
+  my(n = #binary(p), lg = log(n)/log(2), B = ceil(n^2/lg), B2 = B^2, radlim = ceil(n/lg),
      seq = [p], cur = p, lev);
   SC_curves = 0;
   while(cur > 1,
-    lev = sclevel(cur, B, B2);
+    lev = sclevel(cur, B, B2, radlim);
     if(lev == 0, return(0));                             \\ gave up (SC_maxcurves reached)
     seq = concat(seq, [lev[1], lev[2], lev[3]]);
     cur = lev[4]
