@@ -7,9 +7,10 @@
  * p_{k+1} = 1 and n = ceil(log_2 p_0) FIXED for the whole chain: on E_{A_i} : y^2 = x^3 +
  * A_i x^2 + x over F_{p_i} the point with x-coordinate x_i has order exactly o_i, where m_i
  * is B-smooth for B = floor(n^2/log_2 n) with floor(log_2 rad(m_i)) < n/log_2 n (rad(m) is
- * the product of the distinct primes of m), p_{i+1} is a prime in (n^2, sqrt(p_i)) proven
- * prime by the next level, and L_i < o_i < r_i L_i with L_i = (p_i^{1/4}+1)^2 and r_i the
- * least prime divisor of m_i.
+ * the product of the distinct primes of m), p_{i+1} is B-rough and either a prime in
+ * (B^2, sqrt(p_i)) proven prime by the next level, or -- at the last level only -- 1 or
+ * below B^2 (a B-rough integer below B^2 is 1 or prime, so it certifies itself by size),
+ * and L_i < o_i < r_i L_i with L_i = (p_i^{1/4}+1)^2 and r_i the least prime divisor of m_i.
  *
  * Method.  For each level we search random curves E_A/F_{p_i}, compute N = #E_A by SEA
  * (ellcard), and look for a divisor o | N inside the narrow window (L_i, r_i L_i) -- note
@@ -19,7 +20,7 @@
  * part N/s.  That last step is the expensive one: the rough part is factored under an
  * `alarm` time budget (SC_tlim seconds) and the curve is abandoned if the budget runs out
  * -- an early abort that keeps the search on curves whose order factors easily.  A level
- * with a fully smooth o (p_{i+1} = 1) ends the chain.
+ * whose large prime is below B^2 (or absent) ends the chain.
  *
  * Usage:
  *     echo 'printshort(nextprime(10^30))' | gp -q short.gp
@@ -59,8 +60,9 @@ scpoint(E, N, o, fo) = {
   0;
 };
 
-/* One level: search random curves over F_p for [A, x0, o, p_next].  p_next = 1 ends the chain. */
-sclevel(p, n2, B, radlim) = {
+/* One level: search random curves over F_p for [A, x0, o, p_next].  p_next = 1 ends the chain
+ * (including the self-certifying case: a prime q < B^2 stays inside o and needs no recursion). */
+sclevel(p, B, B2, radlim) = {
   my(L = scbound(p), rt = sqrtint(p), A, E, N, sr, s, R, dv, F, m, o, q, Q);
   while(1,
     if(SC_maxcurves && SC_curves >= SC_maxcurves, return(0));
@@ -77,11 +79,19 @@ sclevel(p, n2, B, radlim) = {
         Q = scpoint(E, N, m, factor(m)[,1]);
         if(Q != 0, return([A, lift(Q[1]), m, 1]))));
 
-    \\ (b) cheap descent: the rough part is itself prime, so q = R needs no factoring (note the
-    \\     explicit R > n^2: roughness only guarantees R > B).  Then the discarded cofactor
-    \\     N/o = s/m divides s, i.e. the whole ~sqrt(p) worth of N that we throw away must be
-    \\     smooth, which is very rare for large p -- hence (c).  Costs one primality test.
-    if(s > L && R > n2 && R < rt && ispseudoprime(R),
+    \\ (a') terminal level with a self-certifying prime: the rough part is below B^2, hence
+    \\      automatically prime (no primality test needed!), and stays inside o
+    if(R > 1 && R < B2,
+      for(i = 1, #dv, m = dv[i]; o = m * R;
+        if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
+          Q = scpoint(E, N, o, concat(factor(m)[,1], [R]~));
+          if(Q != 0, return([A, lift(Q[1]), o, 1])))));
+
+    \\ (b) cheap descent: the rough part is itself prime, so q = R needs no factoring.  Then the
+    \\     discarded cofactor N/o = s/m divides s, i.e. the whole ~sqrt(p) worth of N that we
+    \\     throw away must be smooth, which is very rare for large p -- hence (c).  Costs one
+    \\     primality test.
+    if(s > L && R > B2 && R < rt && ispseudoprime(R),
       q = R;
       for(i = 1, #dv, m = dv[i]; o = m * q;
         if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
@@ -95,11 +105,11 @@ sclevel(p, n2, B, radlim) = {
       F = iferr(alarm(SC_tlim, factor(R)[,1]), e, 0);    \\ early abort on slow factorizations
       if(type(F) == "t_COL",
         for(j = 1, #F, q = F[j];
-          if(q > n2 && q < rt,
+          if(q < rt,
             for(i = 1, #dv, m = dv[i]; o = m * q;
               if(m > 1 && o > L && o < factor(m)[1,1] * L && radcap(m, radlim),
                 Q = scpoint(E, N, o, concat(factor(m)[,1], [q]~));
-                if(Q != 0, return([A, lift(Q[1]), o, q]))))))))
+                if(Q != 0, return([A, lift(Q[1]), o, if(q < B2, 1, q)]))))))))
   );
 };
 
@@ -107,11 +117,11 @@ sclevel(p, n2, B, radlim) = {
 shortcert(p) = {
   if(!ispseudoprime(p), error("short: p is composite"));
   if(p < 5, error("short: need p >= 5"));
-  my(n = #binary(p), n2 = n^2, lg = log(n)/log(2), B = floor(n^2/lg), radlim = n/lg,
+  my(n = #binary(p), lg = log(n)/log(2), B = floor(n^2/lg), B2 = B^2, radlim = n/lg,
      seq = [p], cur = p, lev);
   SC_curves = 0;
   while(cur > 1,
-    lev = sclevel(cur, n2, B, radlim);
+    lev = sclevel(cur, B, B2, radlim);
     if(lev == 0, return(0));                             \\ gave up (SC_maxcurves reached)
     seq = concat(seq, [lev[1], lev[2], lev[3]]);
     cur = lev[4]

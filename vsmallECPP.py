@@ -13,10 +13,13 @@ with o_i = m_i * p_{i+1} and p_{k+1} = 1, in which, writing n = ceil(log2 p_0)
 (fixed at the top level for the whole chain) and B = floor(n^2 / log2 n):
 
   - each p_i is odd (p_0 given; later moduli are recovered from the previous
-    level as p_{i+1} = the B-rough part of o_i), with p_{i+1} = 1 or
-    n^2 < p_{i+1} and p_{i+1}^2 < p_i (the floor is explicit: roughness only
-    guarantees p_{i+1} > B);
-  - m_i, the B-smooth part of o_i, satisfies the radical cap
+    level as p_{i+1} = the B-rough part of o_i, which pins the decomposition:
+    m_i is BY DEFINITION the B-smooth part of o_i); for i < k the recursion
+    floor is B^2 < p_{i+1}, with p_{i+1}^2 < p_i; and p_{k+1} is either 1 or
+    less than B^2 -- being B-rough, such a p_{k+1} is automatically prime (a
+    composite B-rough integer exceeds B^2), so the terminal prime certifies
+    itself by size;
+  - m_i satisfies the radical cap
         floor(log2 rad(m_i)) < n / log2 n,
     where rad(m) is the product of the distinct primes of m, and, with r_i its
     least prime divisor,
@@ -28,13 +31,15 @@ with o_i = m_i * p_{i+1} and p_{k+1} = 1, in which, writing n = ceil(log2 p_0)
     curve B y^2 = x^3 + A_i x^2 + x over Z/p_i for some B -- equivalently on
     E_{A_i} or its quadratic twist; the x-only ladder never needs B or y.
 
-Every certificate of this revised format is also valid under the original
-(n^2-smooth, uncapped) definition: the new conditions only restrict.
+A certificate with p_{k+1} = 1 is also valid under the original (n^2-smooth,
+uncapped) definition; one that uses a terminal prime is shorter than any
+equivalent original-format chain -- the recursion stops as soon as the
+remaining prime certifies itself by size.
 
 Why this proves p_0 prime: by induction from the top.  At level i the verifier
 establishes ord(P_i) = o_i modulo every prime divisor l of p_i, with every prime
-factor of o_i certified (primes <= B by trial division, p_{i+1} by the next
-level, 1 trivially).  If some prime l <= sqrt(p_i) divided p_i, then o_i =
+factor of o_i certified (primes <= B by trial division, a recursive p_{i+1} by
+the next level, a terminal p_{k+1} < B^2 by size, 1 trivially).  If some prime l <= sqrt(p_i) divided p_i, then o_i =
 ord(P_i mod l) <= #E(F_l) <= l + 1 + floor(2*sqrt(l)) <= L_i < o_i, a
 contradiction; hence p_i is prime.  The minimality window o_i < r_i * L_i keeps
 the certificate size O(n) (sum of the level sizes is geometric).
@@ -53,7 +58,7 @@ tables.  Per level, gcd(P_B mod o_i, o_i) equals rad(m_i) exactly (P_B is
 squarefree and complete to B), an integer of fewer than n/log2 n bits whose
 prime factors are at most B; the radical cap is read off its bit length, and
 factoring it yields the distinct primes of m_i, whose valuations recover m_i
-and p_{i+1}.  The cap bounds the order-exactness tree by fewer than n ladder
+and p_{i+1}.  A terminal p_{k+1} needs neither factoring nor a primality test.  The cap bounds the order-exactness tree by fewer than n ladder
 bits per level, so the elliptic work is O(sum_i b_i M(b_i)) = O(n^2 log n)
 with level sizes decaying geometrically.  Total: O(n^2 log n) bit operations,
 worst case over certificates, and O(n^2/log n) bits of memory.  (This
@@ -179,6 +184,7 @@ def verify(seq):
     n = p.bit_length()            # = ceil(log2 p0): p0 is odd, never a power of 2
     lg = log2(n)
     B = int(n * n / lg)           # floor(n^2 / log2 n): the smoothness bound
+    B2 = B * B                    # recursion floor; a B-rough integer < B^2 is prime
     radlim = n / lg               # require floor(log2 rad(m)) < radlim
 
     # collect the level orders and pre-screen their sizes so that the work below
@@ -240,9 +246,16 @@ def verify(seq):
         if not (L < o < r * L):
             return False
 
-        # descent: p_next = 1, or n^2 < p_next (explicit floor) and p_next^2 < p
-        if p_next != 1 and (p_next <= n * n or p_next * p_next >= p):
-            return False
+        # descent: a non-terminal level needs B^2 < p_next and p_next^2 < p; the
+        # last level needs p_next = 1 or p_next < B^2 (then p_next is prime by
+        # size, since it is B-rough by construction)
+        last = (i + 3 == len(seq))
+        if last:
+            if p_next != 1 and p_next >= B2:
+                return False
+        else:
+            if p_next <= B2 or p_next * p_next >= p:
+                return False
 
         # [o]P = O reached as a genuine (X:0) with X a unit mod p
         Xo, Zo = ladder(o, x, 1, A, p)
@@ -258,7 +271,7 @@ def verify(seq):
             return False
 
         p = p_next
-    return p == 1                                 # the chain must terminate exactly
+    return True                                   # the last level checked p_next above
 
 
 # --------------------------------------------------------------------------
@@ -274,8 +287,12 @@ _VALID = [
     "11 8 8 8",
     "13 7 2 8",
     "251 180 183 24",
-    # the (migrated) 10^10+19 entry of certs.csv
-    "10000000019 9322349340 1921958667 116108 15213 3538 243",
+    # the (migrated, truncated) 10^10+19 entry of certs.csv: a single level with
+    # terminal prime 29027 < B^2 = 51529
+    "10000000019 9322349340 1921958667 116108",
+    # the 10^20+39 entry: one recursive level (p_1 = 1134163 > B^2) + a fully
+    # smooth terminal
+    "100000000000000000039 89951393186720294033 26135327929659638076 11876954936 609883 131044 1915",
 ]
 
 _INVALID = [
@@ -285,8 +302,10 @@ _INVALID = [
     "251 2 10 32",                 # singular curve (A = 2)
     "221 5 2 34",                  # composite p0 (221 = 13*17)
     "3 0 0 6",                     # p = 3 admits no short ECPP at all
-    "10000000019 9322349340 1921958667 116108 15213 3538 243 0 1 8",
-                                   # trailing level after the chain terminated
+    "10000000019 9322349340 1921958667 116108 15213 3538 243",
+                                   # recursion on 29027 < B^2 (must terminate instead)
+    "100000000000000000039 89951393186720294033 26135327929659638076 11876954936",
+                                   # premature termination: rough part 1134163 > B^2
     # CRT split attack: p0 = 2098153*2102167; (x0,1) has order exactly 8*525029
     # in E(Z/p0) but order 8 mod one factor and 525029 mod the other
     "4410667997551 1365834658413 107710304518 4200232 199129 175565 880",
