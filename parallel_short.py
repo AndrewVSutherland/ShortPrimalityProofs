@@ -13,7 +13,7 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 SHORT_GP = ROOT / "short.gp"
-VERIFIER = ROOT / "vsmallECPP.py"
+VERIFIER = ROOT / "vshortECPP.py"
 
 
 def positive_int(value):
@@ -133,7 +133,7 @@ def verify(certificate):
 def main():
     args = parse_args()
     if not SHORT_GP.exists() or not VERIFIER.exists():
-        raise SystemExit("short.gp and vsmallECPP.py must be beside this script")
+        raise SystemExit("short.gp and vshortECPP.py must be beside this script")
 
     workers = []
     started = time.monotonic()
