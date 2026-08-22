@@ -10,11 +10,11 @@ such that for each $0\le i \le k$ there exist integers $B_i,y_i\in [0,p_i-1]$ wi
 
 For integers $p_0 > 3$, a short ECPP $(p_0,...)$ exists if and only if $p_0$ is prime.  The size of a short ECPP is linear in $n=\log p_0$ and can be verified in quasi-quadratic time (in contrast to the quadratic size and quasi-cubic verification time for a conventional ECPP).
 
-**Format revision (August 2026).**  Relative to the original definition, the smoothness bound was reduced from $n^2$ to $B=\lfloor n^2/\log_2 n\rfloor$, a radical cap was imposed on the $m_i$, and the recursion floor was raised to $B^2$, with the terminal $p_{k+1} < B^2$ now permitted to be prime: having no prime factor $\le B$, it certifies itself by size.  These changes are for the verifier's benefit: the primorial of $B$ can be built per certificate within the verification budget, its gcd with $o_i$ reveals $\mathrm{rad}(m_i)$, the radical cap bounds the order-exactness checks, and the terminal prime needs neither factoring nor a primality test -- so verification costs $O(n^2\log n)$ bit operations *worst case*, self-contained, with no precomputed tables.  Existence for every prime $p_0\ge 5$ is unaffected ($2$-power $m_i$, $p_{k+1}=1$).  All certificates below have been migrated to the revised format.
+**Format revision (August 2026).**  Relative to the original definition, the smoothness bound was reduced from $n^2$ to $B=\lceil n^2/\log_2 n\rceil$, a radical cap was imposed on the $m_i$, and the recursion floor was raised to $B^2$, with the terminal $p_{k+1} < B^2$ now permitted to be prime: having no prime factor $\le B$, it certifies itself by size.  These changes are for the verifier's benefit: the primorial of $B$ can be built per certificate within the verification budget, its gcd with $o_i$ reveals $\mathrm{rad}(m_i)$, the radical cap bounds the order-exactness checks, and the terminal prime needs neither factoring nor a primality test -- so verification costs $O(n^2\log n)$ bit operations *worst case*, self-contained, with no precomputed tables.  Existence for every prime $p_0\ge 5$ is unaffected ($2$-power $m_i$, $p_{k+1}=1$).  All certificates below have been migrated to the revised format.
 
 This repository contains the following resources:
-- vsmallECPP.py is a Python program that verifies a short ECPP in quasi-quadratic time.
-- short8all.txt contains the 55,056 short ECPPs with $p_0\le 2^8$.
+- vshortECPP.py is a Python program that verifies a short ECPP in quasi-quadratic time.
+- short8all.txt contains the 162,042 short ECPPs with $p_0\le 2^8$.
 - short.gp is a GP script that uses SEA on random curves to search for short ECPPs (a deliberately simple demonstration implementation: clarity over speed).
 - parallel_short.py runs independent short.gp searches with varied factoring time budgets, and verifies the first certificate found.
 - certs.csv is a list of short ECPPs for the primes listed in the table below.

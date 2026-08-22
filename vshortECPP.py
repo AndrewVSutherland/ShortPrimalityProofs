@@ -10,7 +10,7 @@ A short ECPP for p_0 is a flat integer sequence
     (p_0, A_0, x_0, o_0, A_1, x_1, o_1, ..., A_k, x_k, o_k)
 
 with o_i = m_i * p_{i+1} and p_{k+1} = 1, in which, writing n = ceil(log2 p_0)
-(fixed at the top level for the whole chain) and B = floor(n^2 / log2 n):
+(fixed at the top level for the whole chain) and B = ceil(n^2 / log2 n):
 
   - each p_i is odd (p_0 given; later moduli are recovered from the previous
     level as p_{i+1} = the B-rough part of o_i, which pins the decomposition:
@@ -68,8 +68,8 @@ only far beyond feasible sizes; a remainder tree over the primorial's product
 tree, or Pollard--Strassen with search radius B, keeps even that step within
 O(n^2 log n).)
 
-usage: python3 vsmallECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]
-       python3 vsmallECPP.py --test
+usage: python3 vshortECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]
+       python3 vshortECPP.py --test
 Prints True and exits 0 iff the sequence is a valid short ECPP (p_0 is prime).
 """
 
@@ -183,9 +183,9 @@ def verify(seq):
         return False
     n = p.bit_length()            # = ceil(log2 p0): p0 is odd, never a power of 2
     lg = log2(n)
-    B = int(n * n / lg)           # floor(n^2 / log2 n): the smoothness bound
+    from math import ceil
+    B = ceil(n * n / lg)          # ceil(n^2 / log2 n): the smoothness bound
     B2 = B * B                    # recursion floor; a B-rough integer < B^2 is prime
-    radlim = n / lg               # require floor(log2 rad(m)) < radlim
 
     # collect the level orders and pre-screen their sizes so that the work below
     # runs on a certificate-independent budget.  Both bounds are implied by
@@ -218,8 +218,8 @@ def verify(seq):
         g = gcd(P % o, o)
         if g <= 1:                                # m = 1: r undefined, reject
             return False
-        if g.bit_length() - 1 >= radlim:          # the radical cap
-            return False
+        if g.bit_length() > B:                    # log2 rad(m) <= B, as specified
+            return False                          # (cannot bind: log2 rad < n/2 + log2 B << B)
         small = []                                # ascending prime factors of g
         gg = g
         for q in primes:
@@ -293,11 +293,13 @@ _VALID = [
     # the 10^20+39 entry: one recursive level (p_1 = 1134163 > B^2) + a fully
     # smooth terminal
     "100000000000000000039 89951393186720294033 26135327929659638076 11876954936 609883 131044 1915",
+    # valid again under the August 2026 convention (the earlier draft's radical
+    # cap floor(log2 rad) < n/log2 n rejected these; log2 rad <= B does not)
+    "251 0 10 63",
+    "11 0 3 12",
 ]
 
 _INVALID = [
-    "251 0 10 63",                 # valid in the ORIGINAL format; the radical cap rejects
-    "11 0 3 12",                   # ditto (rad 6: floor(log2 6) = 2 is not < 4/2)
     "251 0 10 126",                # m doubled: breaks the minimality window
     "251 2 10 32",                 # singular curve (A = 2)
     "221 5 2 34",                  # composite p0 (221 = 13*17)
@@ -329,7 +331,7 @@ if __name__ == "__main__":
     try:
         seq = [int(t) for t in sys.argv[1:]]
     except ValueError:
-        print("usage: vsmallECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]")
+        print("usage: vshortECPP.py p0 A0 x0 o0 [A1 x1 o1 ...]")
         sys.exit(2)
     r = verify(seq)
     print(r)
