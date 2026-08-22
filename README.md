@@ -1,8 +1,8 @@
 # ShortPrimalityProofs
 For the purpose of this repository, a **short ECPP** is a sequence of integers $(p_0,A_0,x_0,m_0p_1,A_1,x_1,\ldots,m_{k-1}p_k,A_k,x_k,m_kp_{k+1})$ in which
 - we have $k \ge 0$, $p_0 \ge 5$, and put $n:=\lceil \log_2 p_0\rceil$,
-- the $p_i$ are odd integers and $p_1,\ldots,p_{k+1}$ have no prime factors $\le B$, where $B:=\lfloor n^2/\log_2 n\rfloor$ (note that this allows $p_{k+1}=1$), satisfying $B^2 < p_{i+1} < \sqrt{p_i}$ for $0\le i < k$ and $p_{k+1} < B^2$ (an integer below $B^2$ with no prime factor $\le B$ is either $1$ or prime),
-- the $m_i$ are $B$-smooth integers whose radicals satisfy $\lfloor \log_2 \mathrm{rad}(m_i)\rfloor < n/\log_2 n$ (here $\mathrm{rad}(m)$ denotes the product of the distinct primes of $m$), satisfying $L_i < m_ip_{i+1} < r_iL_i$, where $L_i = q_i+1+\lfloor 2\sqrt{q_i}\rfloor$ with $q_i=\lfloor\sqrt{p_i}\rfloor$ and $r_i$ is the least prime divisor of $m_i$,
+- the $p_i$ are odd integers and $p_1,\ldots,p_{k+1}$ have no prime factors $\le B$, where $B:=\lceil n^2/\log_2 n\rceil$, satisfying $B^2 < p_{i+1} < \sqrt{p_i}$ for $0\le i < k$ and $p_{k+1} < B^2$ (an integer below $B^2$ with no prime factor $\le B$ is either $1$ or prime),
+- the $m_i$ are $B$-smooth integers with $\log_2 \mathrm{rad}(m_i) \le B$ (where $\mathrm{rad}(m)$ denotes the product of the distinct prime divisors of $m$), satisfying $L_i < m_ip_{i+1} < r_iL_i$, where $L_i = q_i+1+\lfloor 2\sqrt{q_i}\rfloor$ with $q_i=\lfloor\sqrt{p_i}\rfloor$, and $r_i$ is the least prime divisor of $m_i$,
 - each $A_i$ is a nonnegative integer less than $p_i$ with $\gcd(A_i^2-4,p_i)=1$,
 - each $x_i$ is a nonnegative integer less than $p_i$,
 
