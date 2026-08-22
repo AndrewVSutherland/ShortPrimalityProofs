@@ -80,24 +80,6 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--factor-flags",
-        type=nonnegative_int_list,
-        default=[0, 0, 0, 9, 8],
-        help=(
-            "comma-separated PARI factorint flags assigned cyclically "
-            "to workers (default: 0,0,0,9,8; 9 is fast partial factoring)"
-        ),
-    )
-    parser.add_argument(
-        "--branch-curves",
-        type=nonnegative_int,
-        default=64,
-        help=(
-            "curve-order budget for each child subtree before backtracking "
-            "(default: 64; 0 disables backtracking)"
-        ),
-    )
-    parser.add_argument(
         "--seed",
         type=positive_int,
         default=1,
@@ -109,14 +91,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def worker_input(p, factor_seconds, factor_flags, branch_curves, seed, gp_threads):
+def worker_input(p, factor_seconds, seed, gp_threads):
     return (
         f"default(nbthreads,{gp_threads}); SC_tlim={factor_seconds}; "
-        f"SC_factorflags={factor_flags}; "
-        f"SC_branchcurves={branch_curves}; "
         f"setrand({seed}); c=shortcert({p}); "
         'for(i=1,#c,printf("%d%s",c[i],if(i<#c," ","\\n"))); '
-        'warning("curves=",SC_curves," sea_calls=",SC_seacalls);\n'
+        'warning("curves=",SC_curves);\n'
     )
 
 
@@ -160,7 +140,6 @@ def main():
     try:
         for index in range(args.workers):
             factor_seconds = args.factor_seconds[index % len(args.factor_seconds)]
-            factor_flags = args.factor_flags[index % len(args.factor_flags)]
             log = tempfile.TemporaryFile(mode="w+")
             process = subprocess.Popen(
                 ["gp", "-q", str(SHORT_GP)],
@@ -174,8 +153,6 @@ def main():
                 worker_input(
                     args.p,
                     factor_seconds,
-                    factor_flags,
-                    args.branch_curves,
                     args.seed + index,
                     args.gp_threads,
                 )
@@ -187,9 +164,6 @@ def main():
             f"with seeds {args.seed}..{args.seed + args.workers - 1} "
             f"and factor limits "
             f"{[args.factor_seconds[i % len(args.factor_seconds)] for i in range(args.workers)]}; "
-            f"factor flags "
-            f"{[args.factor_flags[i % len(args.factor_flags)] for i in range(args.workers)]}; "
-            f"child-branch budget {args.branch_curves}; "
             f"{args.gp_threads} PARI thread(s) each",
             file=sys.stderr,
             flush=True,
